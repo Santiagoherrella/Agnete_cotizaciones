@@ -1,0 +1,55 @@
+from typing import TypedDict, List, Dict, Any, Annotated
+import operator
+
+class BotState(TypedDict):
+    # ==========================================
+    # FASE 1: ENTRADAS Y EXTRACCIÓN
+    # ==========================================
+    ruta_documento: str             # El PDF, Excel o Word que subió el cliente
+    texto_extraido: str             # El crudo (OCR / PyMuPDF)
+    
+    # ==========================================
+    # FASE 2: INVENTARIO GLOBAL
+    # ==========================================
+    inventario_global: List[Dict]   # Ej: [{item: 1, kVA: 100}, {item: 2, kVA: 25}]
+    ruta_excel_inventario: str      # Donde guardaremos el primer "Entregable Excel"
+    
+    # ==========================================
+    # FASE 3: EL ENRUTADOR Y SUB-GRAFOS (TRABAJO POR FAMILIA)
+    # ==========================================
+    # Mantendremos este nombre por compatibilidad con tu código actual, 
+    # pero ahora guardará la "Familia" en proceso (ej. "Convencional Pedestal")
+    item_actual_id: str             
+    
+    # --- A. Datos de los 4 Escuadrones (Memoria de Trabajo) ---
+    datos_electricos: Dict          # Lo que llene el Escuadrón Eléctrico
+    datos_mecanicos: Dict           # Lo que llene el Escuadrón Mecánico
+    datos_accesorios: Dict          # Lo que llene el Escuadrón de Accesorios
+    datos_logisticos: Dict          # NUEVO: Lo que llene el Escuadrón Comercial/Logístico
+
+    # --- B. Contadores de Reintentos (Fallback Logic) ---
+    # Controlan cuántas veces el Extractor ha intentado buscar el dato antes de usar Norma ANSI
+    intentos_electrico: int
+    intentos_mecanico: int
+    intentos_accesorios: int
+    intentos_logistico: int
+
+    # --- C. Canal de Comunicación Revisor -> Extractor ---
+    # Aquí el Revisor anota: "Te faltó la impedancia, búscala en la página 4"
+    feedback_electrico: str
+    feedback_mecanico: str
+    feedback_accesorios: str
+    feedback_logistico: str
+    errores_extraccion: List[str]   # Logs de errores del sistema
+
+    # --- D. Alertas de Diseño (El Valor Agregado) ---
+    # Los revisores anotarán aquí sus sugerencias normativas si el pliego es deficiente
+    alertas_diseno: Annotated[List[str], operator.add]
+    # ==========================================
+    # FASE 4: ENTREGABLES Y CIERRE (Acumuladores)
+    # ==========================================
+    # El operador 'operator.add' hace que los datos se concatenen en lugar de sobrescribirse
+    resumenes_completados: Annotated[List[str], operator.add]
+    fichas_tecnicas_finales: Annotated[List[Dict], operator.add]
+    rutas_fichas_word: Annotated[List[str], operator.add]
+    rutas_tablas_ctg: Annotated[List[str], operator.add] # Actualizado según tu test_martes.py
