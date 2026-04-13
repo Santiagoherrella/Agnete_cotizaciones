@@ -1,0 +1,14 @@
+7c69f87 - 2026-04-08 - CUS2024-012: Ajustes finales en modelos y generador CTG
+b51809f - 2026-04-07 - CUS2024-011: Refactorización del Ensamblaje Final (Word y Excel CTG) - Rediseño de exportador.py: Creación de un "Cerebro Independiente" para el CTG que utiliza el modelo de alta capacidad para lectura granular de tablas de pérdidas y fases. - Implementación de Mapeo 1 a 1: El código ahora cruza la extracción del LLM con la verdad absoluta del Inventario, garantizando que el Excel final mantenga el número exacto de columnas, kVA y voltajes sin alucinaciones. - Inyección de datos obligatorios: Se fuerza comercialmente a "MAGNETRON S.A.S." como fabricante en el entregable final. - Actualización de resumen_general: Implementación de la función limpiar_texto basada en Regex para eliminar caracteres de control invisibles del OCR. - Separación de responsabilidades confirmada: Escuadrones (Macro/Word) vs. Generador CTG (Micro/Excel).
+86a3fef - 2026-04-07 - CUS2024-010: Integración Completa de la Fábrica de Especialistas
+07cf253 - 2026-04-07 - CUS2024-009: Implementación de Escuadrón Eléctrico con Revisor Iterativo y Fallback ANSI
+20f3a10 - 2026-04-01 - CUS2024-008: Implementacion de Fabrica de Modelos y enrutamiento dinamico de LLMs
+bcca073 - 2026-03-31 - CUS2024-007: Integracion de Agente CTG, extraccion EML y escudo anti-basura
+8606570 - 2026-03-31 - CUS2024-006: Integración de Agente CTG y exportación nativa a Word/Excel
+767ce8f - 2026-03-30 - CUS2024-005: Eliminar carpetas de prueba subidas por error y actualizar gitignore
+f6b83f4 - 2026-03-30 - CUS2024-004: Implementar agente de resumen ejecutivo por familia o tipo de transformador
+6439380 - 2026-03-30 - CUS2024-003: Implementar Enrutador Multiagente con OpenAI y procesamiento Batch de contexto cruzado
+fef99c2 - 2026-03-30 - CUS2024-002: Eliminar carpetas de prueba subidas por error y actualizar gitignore
+3ec1125 - 2026-03-30 - CUS2024-001: Primera base funcional Fase 1 - Extraccion de Inventario
+88b6459 - 2026-03-30 - Initialize from template: agente_cotizaciones
+0aa1856 - 2025-12-01 - Sonar Generico

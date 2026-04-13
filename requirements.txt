@@ -1,0 +1,20 @@
+# --- INTERFAZ DE USUARIO ---
+streamlit
+
+# --- ORQUESTACIÓN Y AGENTES (LangGraph/LangChain) ---
+langchain
+langchain-core
+langchain-google-genai  # Asumiendo que usaremos Gemini para la lógica
+langchain-openai        # Por si necesitamos un modelo de respaldo
+langgraph
+
+# --- MOLDES DE INGENIERÍA ---
+pydantic
+
+# --- EXTRACCIÓN MULTIMODAL (FASE 1) ---
+PyMuPDF
+pdfplumber
+# camelot-py[cv]  # Descomenta esto si en tu script original usaste Camelot para tablas
+
+# --- SEGURIDAD Y ENTORNO ---
+python-dotenv
