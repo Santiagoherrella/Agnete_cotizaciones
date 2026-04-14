@@ -1,3 +1,21 @@
+"""
+resumen_general.py - Ensamblador del reporte final en formato Word.
+
+Propósito general:
+Este módulo toma todos los datos extraídos y revisados por los "escuadrones"
+(Eléctrico, Mecánico, Accesorios, Logístico) y construye un documento Word (.docx)
+ordenado y formateado, listo para ser revisado por los ingenieros de diseño y cotizaciones.
+
+Cuándo usarlo:
+Se invoca en `grafo.py` después de que el último escuadrón técnico y logístico termina 
+exitosamente (o agota sus intentos). Genera el entregable oficial para la familia procesada.
+
+Requisitos:
+- Librería `python-docx` para la generación del documento Word.
+- Un estado de grafo (`BotState`) que contenga los datos técnicos `datos_electricos`, 
+  `datos_mecanicos`, `datos_accesorios`, `datos_logisticos` y `alertas_diseno`.
+"""
+
 import os
 from datetime import datetime
 from docx import Document
@@ -5,14 +23,30 @@ from docx.shared import Pt, RGBColor
 from src.schemas.state import BotState
 
 def limpiar_texto_xml(texto):
-    """Elimina caracteres de control invisibles que rompen la librería de Word."""
+    """
+    Elimina caracteres de control invisibles que rompen la librería de Word al guardar el XML subyacente.
+    
+    Parámetros:
+    - texto (str): El texto a procesar.
+    
+    Retorna:
+    - string limpio y compatible con archivos Office Open XML.
+    """
     if not isinstance(texto, str):
         return str(texto)
     # Solo permite tabulaciones, saltos de línea y caracteres de texto normales (ASCII/Unicode >= 32)
     return "".join(c for c in texto if ord(c) in (9, 10, 13) or ord(c) >= 32)
 
 def formatear_diccionario(doc: Document, titulo: str, datos: dict):
-    """Escribe una sección en el Word extrayendo el valor y el origen."""
+    """
+    Escribe una sección completa en el documento Word extrayendo el valor y detallando el origen.
+    Marca con color gris si un dato fue inferido y no leído explícitamente.
+    
+    Parámetros:
+    - doc (Document): Instancia actual del documento python-docx.
+    - titulo (str): Encabezado de la nueva sección (e.g. "1. Parámetros Eléctricos").
+    - datos (dict): Diccionario tipado (Pydantic volcado) con clave, valor y origen.
+    """
     if not datos: return
     
     doc.add_heading(titulo, level=2)
@@ -29,15 +63,23 @@ def formatear_diccionario(doc: Document, titulo: str, datos: dict):
         p.add_run(f"• {nombre_campo}: ").bold = True
         p.add_run(f"{valor}")
         
-        # Si el dato fue inyectado por una norma, lo marcamos en gris y cursiva
+        # Si el dato fue inyectado por una norma o deducido, lo marcamos en gris y cursiva
         if origen not in ["Pliego", "No especificado"]:
             run_origen = p.add_run(f" (Dato asumido por: {origen})")
             run_origen.italic = True
             run_origen.font.color.rgb = RGBColor(128, 128, 128)
 
 def nodo_generar_resumen_tipo(state: BotState):
-    """Toma los JSON de los 4 escuadrones y ensambla el Word final para la familia."""
+    """
+    Toma los JSON generados en el estado por los 4 escuadrones (Eléctrico, Mecánico, 
+    Accesorios y Logístico) y los ensambla en un documento `.docx` para cada familia.
     
+    Parámetros:
+    - state (BotState): Estado del grafo en LangGraph.
+    
+    Retorna:
+    - Diccionario con la confirmación de la familia procesada y la nueva ruta del Word generado.
+    """
     # 1. Identificar la Familia actual
     inventario = state.get("inventario_global", [])
     item_id = state.get("item_actual_id", "")
@@ -86,3 +128,11 @@ def nodo_generar_resumen_tipo(state: BotState):
         "resumenes_completados": completados_actuales + [familia],
         "rutas_fichas_word": rutas_actuales + [ruta_docx]
     }
+
+# ==========================================
+# METADATA
+# tools_used: [python-docx, os, datetime]
+# use_cases: [Generación de informes Word, Consolidación de datos JSON a formato lectura]
+# reusable_components: [limpiar_texto_xml, formatear_diccionario, nodo_generar_resumen_tipo]
+# dependencies: [pip install python-docx]
+# ==========================================

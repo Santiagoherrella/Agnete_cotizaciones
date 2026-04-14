@@ -1,14 +1,31 @@
+"""
+escuadron_logistico.py - Agentes encargados de extraer condiciones comerciales y logísticas.
+
+Propósito general:
+Extrae y valida la información no técnica del pliego (fechas, garantías, incoterms, 
+condiciones de entrega, penalizaciones y requerimientos de presentación de la oferta).
+
+Cuándo usarlo:
+Se invoca en la parte final del pipeline de los escuadrones técnicos, usualmente para 
+compilar los datos que permitirán elaborar la sección comercial de la cotización final.
+
+Requisitos:
+- El estado general (`BotState`) y la información del inventario.
+- Acceso a `get_llm("agente_logistico")`.
+- Modelos tipados de `DatosLogisticos`.
+"""
+
 from langchain_core.prompts import ChatPromptTemplate
 from src.corelogic import get_llm
 from src.schemas.modelos import DatosLogisticos
 from src.schemas.state import BotState
 
 # ==========================================
-# 1. EL PROMPT DEL EXTRACTOR (Basado en prpmpt comercial.txt)
+# 1. EL PROMPT DEL EXTRACTOR (Basado en prompt comercial.txt)
 # ==========================================
 PROMPT_EXTRACTOR_LOGISTICO = """
 Eres un Analista Comercial Senior elaborando licitaciones para Magnetron USA LLC (fabricación en MAGNETRON S.A.S. Colombia).
-Extrae ÚNICAMENTE la información COMERCIAL, LOGÍSTICA y JURÍDICA que apñlica para este tipo de transformador:
+Extrae ÚNICAMENTE la información COMERCIAL, LOGÍSTICA y JURÍDICA que aplica para este tipo de transformador:
 
 EQUIPO: {tipo_transformador}
 
@@ -53,7 +70,7 @@ INSTRUCCIONES CRÍTICAS:
      2.6. Permite formula de reajuste de precio
      2.7. Identifica si se debe anexar fianza de seriedad de la oferta
      2.8. Detalla requerimiento sobre pólizas y seguros aplicables
-     2.9.Identifica si hay requisito de estampillas e impuestos 		 
+     2.9. Identifica si hay requisito de estampillas e impuestos 		 
 3. EXTRAER REVISION JURIDICA
     3.1. Anexos minuta de contrato o términos de contratación.
     3.2. Penalizaciones o multas
@@ -63,8 +80,8 @@ INSTRUCCIONES CRÍTICAS:
     5.1. Solicitud índice y paginado
     5.2. Solicitud Formato de los archivos
 6. EXTRAER INFORMACION SOBRE ENTREGAS
-    6.1.Lugar entrega – Zip code
-    6.2.Incoterm .
+    6.1. Lugar entrega – Zip code
+    6.2. Incoterm .
     6.3. Condiciones de transporteCondiciones especiales sobre horarios de entrega 
 7. EXTRAER ENTREGABLES DE LA OFERTA 
 (Solo incluir datos disponibles):
@@ -78,11 +95,22 @@ TEXTO DEL PLIEGO:
 """
 
 def nodo_extractor_logistico(state: BotState):
+    """
+    Localiza en el pliego todas las condiciones logísticas, comerciales y legales usando el LLM.
+    
+    Parámetros:
+    - state (BotState): Estado del grafo con acceso a `texto_extraido`.
+    
+    Retorna:
+    - `{"datos_logisticos": {...}}` con el mapa de la data según la interfaz `DatosLogisticos`.
+    """
     print(f"🚚 [Extractor Logístico] Analizando reglas comerciales para: {state.get('item_actual_id', '')} (Intento {state.get('intentos_logistico', 0) + 1})")
     
     texto_crudo = state.get("texto_extraido", "")
     trafo_actual = next((t for t in state.get("inventario_global", []) if t["item_id"] == state.get("item_actual_id", "")), None)
-    if not trafo_actual: return {"datos_logisticos": {}}
+    
+    if not trafo_actual: 
+        return {"datos_logisticos": {}}
 
     feedback = state.get("feedback_logistico", "")
     bloque_feedback = f"\n⚠️ ATENCIÓN - INSTRUCCIÓN DEL REVISOR:\n{feedback}\n" if feedback and "APROBADO" not in feedback else ""
@@ -100,6 +128,16 @@ def nodo_extractor_logistico(state: BotState):
     return {"datos_logisticos": resultado.model_dump() if hasattr(resultado, 'model_dump') else resultado.dict()}
 
 def nodo_revisor_logistico(state: BotState):
+    """
+    Auditor logístico/comercial. Confirma que variables crudas como lugar de entrega 
+    e información de garantías no falten.
+    
+    Parámetros:
+    - state (BotState): Estado actual.
+    
+    Retorna:
+    - Actualización del estado (intentos consumidos, alertas de fallback).
+    """
     datos = state.get("datos_logisticos", {})
     intentos = state.get("intentos_logistico", 0)
     print(f"🕵️‍♂️ [Revisor Comercial] Auditando riesgos del pliego...")
@@ -133,6 +171,15 @@ def nodo_revisor_logistico(state: BotState):
     }
 
 def decidir_ruta_logistico(state: BotState):
+    """ Enrutador condicional. Si aprueba, pasa a la construcción del word (siguiente paso en grafo.py) """
     if "APROBADO" in state.get("feedback_logistico", ""):
         return "fin_logistico"
     return "reintentar_logistico"
+
+# ==========================================
+# METADATA
+# tools_used: [langchain_core]
+# use_cases: [Extracción parámetros logísticos y legales, Auditoría de términos comerciales]
+# reusable_components: [nodo_extractor_logistico, nodo_revisor_logistico]
+# dependencies: [pip install langchain-core pydantic]
+# ==========================================

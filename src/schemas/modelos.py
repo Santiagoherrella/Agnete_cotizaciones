@@ -1,3 +1,19 @@
+"""
+modelos.py - Definición estricta de esquemas Pydantic para el Output Parser.
+
+Propósito general:
+Contiene todas las clases Pydantic que garantizan que el LLM devuelva la información
+en un formato JSON predecible, tipado y validado. Actúa como el diccionario 
+de datos del sistema.
+
+Cuándo usarlo:
+Se utiliza en la instanciación de `.with_structured_output(...)` en todos 
+los agentes y extractores a lo largo del sistema.
+
+Requisitos:
+- Librería `pydantic`.
+"""
+
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
@@ -123,3 +139,11 @@ class VarianteCTG(BaseModel):
 class TablaCTGFamilia(BaseModel):
     tipo_transformador: str = Field(description="Tipo de transformador")
     variantes: List[VarianteCTG] = Field(description="Lista de variantes, UNA POR CADA EQUIPO solicitado")
+
+# ==========================================
+# METADATA
+# tools_used: [pydantic]
+# use_cases: [Validación de respuestas del LLM, Definir estructura de datos de la cotización]
+# reusable_components: [InventarioPedido, DatosElectricos, DatosMecanicos, DatosAccesorios, DatosLogisticos, TablaCTGFamilia]
+# dependencies: [pip install pydantic]
+# ==========================================

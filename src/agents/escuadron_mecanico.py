@@ -1,3 +1,22 @@
+"""
+escuadron_mecanico.py - Agentes encargados de extraer parámetros mecánicos y constructivos.
+
+Propósito general:
+Este módulo contiene el extractor y el revisor correspondientes a la fase mecánica del 
+diseño de transformadores. Su objetivo es identificar y validar variables constructivas 
+(materiales del tanque, refrigeración, pintura, color, peso) en el pliego del cliente.
+
+Cuándo usarlo:
+Se ejecuta automáticamente en `grafo.py` después del escuadrón eléctrico. Extrae data, 
+y en caso de no hallar color de pintura o fluido dieléctrico, el revisor intentará 
+reguiar al extractor y finalmente emitirá una sugerencia ANSI.
+
+Requisitos:
+- El estado general (`BotState`) y la información del inventario.
+- Acceso a `get_llm("agente_mecanico")`.
+- Modelos tipados de `DatosMecanicos`.
+"""
+
 from langchain_core.prompts import ChatPromptTemplate
 from src.corelogic import get_llm
 from src.schemas.modelos import DatosMecanicos
@@ -51,11 +70,22 @@ TEXTO DEL PLIEGO:
 # 2. EL NODO EXTRACTOR
 # ==========================================
 def nodo_extractor_mecanico(state: BotState):
+    """
+    Busca e identifica los parámetros constructivos utilizando el LLM estructurado.
+    
+    Parámetros:
+    - state (BotState): Estado global.
+    
+    Retorna:
+    - Diccionario con la clave "datos_mecanicos" con los campos requeridos mapeados.
+    """
     print(f"🔩 [Extractor Mecánico] Analizando {state['item_actual_id']} (Intento {state.get('intentos_mecanico', 0) + 1})")
     
     texto_crudo = state.get("texto_extraido", "")
     trafo_actual = next((t for t in state.get("inventario_global", []) if t["item_id"] == state.get("item_actual_id", "")), None)
-    if not trafo_actual: return {"datos_mecanicos": {}}
+    
+    if not trafo_actual: 
+        return {"datos_mecanicos": {}}
 
     feedback = state.get("feedback_mecanico", "")
     bloque_feedback = f"\n⚠️ ATENCIÓN - INSTRUCCIÓN DEL REVISOR:\n{feedback}\n" if feedback and "APROBADO" not in feedback else ""
@@ -77,6 +107,16 @@ def nodo_extractor_mecanico(state: BotState):
 # 3. EL NODO REVISOR (Con Alertas de Diseño)
 # ==========================================
 def nodo_revisor_mecanico(state: BotState):
+    """
+    Auditor de las variables mecánicas. Detecta si falta color de pintura o el 
+    fluido dieléctrico, y solicita iterar si hay intentos o emite alertas de diseño.
+    
+    Parámetros:
+    - state (BotState): Estado actual.
+    
+    Retorna:
+    - Actualización del estado (intento consumidos, y alertas).
+    """
     datos = state.get("datos_mecanicos", {})
     intentos = state.get("intentos_mecanico", 0)
     print(f"🕵️‍♂️ [Revisor Mecánico] Auditando datos...")
@@ -113,6 +153,15 @@ def nodo_revisor_mecanico(state: BotState):
 # 4. EL ENRUTADOR
 # ==========================================
 def decidir_ruta_mecanico(state: BotState):
+    """ Enrutador hacia la siguiente fase de accesorios. """
     if "APROBADO" in state.get("feedback_mecanico", ""):
         return "fin_mecanico"
     return "reintentar_mecanico"
+
+# ==========================================
+# METADATA
+# tools_used: [langchain_core]
+# use_cases: [Extracción parámetros mecánicos y constructivos, Auto-Revisión LLM]
+# reusable_components: [nodo_extractor_mecanico, nodo_revisor_mecanico]
+# dependencies: [pip install langchain-core pydantic]
+# ==========================================

@@ -1,4 +1,4 @@
-# 🤖 Sistema Multi-Agente de Análisis de Cotizaciones (CUS) - Magnetron S.A.S.
+# 🤖 Sistema Multi-Agente de Análisis de Cotizaciones - Magnetron S.A.S.
 
 ![Estado](https://img.shields.io/badge/Estado-En_Pruebas-success)
 ![Arquitectura](https://img.shields.io/badge/Arquitectura-LangGraph_Multi--Agent-blue)
@@ -199,3 +199,14 @@ Una vez que el sistema finaliza, genera dos entregables clave:
 * **2026-03-30 | `3ec1125`:** CUS2024-001 - Primera base funcional Fase 1 - Extraccion de Inventario
 * **2026-03-30 | `88b6459`:** Initialize from template: agente_cotizaciones
 * **2025-12-01 | `0aa1856`:** Sonar Generico
+
+---
+
+## 📚 13. Documentación Extendida
+
+Se ha realizado un proceso exhaustivo de documentación en todo el repositorio (abril 2026), agregando metadata YAML y docstrings detallando el propósito y uso de cada módulo:
+- `src/corelogic.py`: Gestión de selección e inicialización de LLMs.
+- `src/grafo.py`: Orquestador principal (Máquina Magnetrón).
+- `src/agents/`: Nodos especializados de extracción técnica, logística y comercial (Escuadrones y CTG).
+- `src/tools/`: Utilidades exportadoras (Excel/Word) y lectores PDF/Email con módulo de IA integrados.
+- `src/schemas/`: Componentes Pydantic strict-mode garantes del tipado desde el estado de LangGraph hasta el Output Parser final.

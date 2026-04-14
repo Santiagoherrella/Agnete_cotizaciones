@@ -1,3 +1,20 @@
+"""
+extractor.py - Herramienta para lectura universal de documentos y correos.
+
+Propósito general:
+Sirve como el procesador central de entrada para el bot. Es capaz de leer archivos 
+PDF, Word, Excel, texto plano y archivos de correo .eml, convirtiéndolos en una cadena de 
+texto plano limpio que los agentes (LLMs) pueden consumir fácilmente.
+
+Cuándo usarlo:
+Esta herramienta debe invocarse antes de que inicie el grafo (`grafo.py`), o en la etapa de 
+formateo de la entrada del usuario, para transformar el archivo cargado en `texto_extraido`.
+
+Requisitos:
+- Librerías: `fitz` (PyMuPDF), `docx`, `pandas`, `bs4`.
+- Un LLM multimodal para la visión de imágenes incrustadas (e.g. `gpt-4o` o `gemini-1.5-pro`).
+"""
+
 import os
 import fitz  # PyMuPDF para PDFs
 import docx  # Para archivos Word
@@ -11,7 +28,16 @@ from langchain_core.messages import HumanMessage
 from src.corelogic import get_llm
 
 def limpiar_basura_digital(texto: str) -> str:
-    """Filtro de seguridad para destruir bloques Base64, Hexadecimales o texto CMAP corrupto."""
+    """
+    Filtro de seguridad para destruir bloques Base64, Hexadecimales o texto CMAP corrupto.
+    Esto previene que el LLM sufra sobrecarga de tokens y alucinaciones por inyecciones binarias.
+    
+    Parámetros:
+    - texto (str): Texto crudo.
+    
+    Retorna:
+    - str: Texto saneado.
+    """
     if not texto:
         return ""
     # Elimina cualquier 'palabra' de más de 80 caracteres seguidos sin espacios (típico de Base64 oculto)
@@ -21,7 +47,17 @@ def limpiar_basura_digital(texto: str) -> str:
     return texto_filtrado
 
 def procesar_correo_eml(ruta_archivo: str) -> str:
-    """Procesa un archivo .eml extrayendo texto nativo y aplicando visión a imágenes incrustadas."""
+    """
+    Procesa un archivo .eml extrayendo texto nativo (plano y HTML) y aplicando 
+    visión artificial (LLM) a imágenes incrustadas que podrían contener tablas 
+    de cantidades técnicas.
+    
+    Parámetros:
+    - ruta_archivo (str): Path al archivo .eml.
+    
+    Retorna:
+    - str: Consolidado de metadatos, texto limpio y texto extraído de las imágenes.
+    """
     texto_consolidado = ""
     llm_vision = get_llm("vision")
     
@@ -41,6 +77,7 @@ def procesar_correo_eml(ruta_archivo: str) -> str:
         if content_type.startswith("multipart/"):
             continue
 
+        # Bloque para texto sin formato
         if content_type == "text/plain" and "attachment" not in disposition:
             payload = part.get_payload(decode=True)
             if payload:
@@ -49,6 +86,7 @@ def procesar_correo_eml(ruta_archivo: str) -> str:
                 if texto_limpio:
                     texto_consolidado += f"{texto_limpio}\n\n"
             
+        # Bloque para texto HTML (muy común en Outlook corporativo)
         elif content_type == "text/html" and "attachment" not in disposition:
             payload = part.get_payload(decode=True)
             if payload:
@@ -59,9 +97,10 @@ def procesar_correo_eml(ruta_archivo: str) -> str:
                 if texto_limpio:
                     texto_consolidado += f"{texto_limpio}\n\n"
             
+        # Motor de Visión para imágenes incrustadas (firmas, fotos de placas, tablas pegadas)
         elif content_type.startswith("image/"):
             bytes_imagen = part.get_payload(decode=True)
-            if not bytes_imagen or len(bytes_imagen) < 3000:
+            if not bytes_imagen or len(bytes_imagen) < 3000: # Ignorar iconos pequeños
                 continue 
                 
             img_b64 = base64.b64encode(bytes_imagen).decode("utf-8")
@@ -83,6 +122,7 @@ def procesar_correo_eml(ruta_archivo: str) -> str:
                 respuesta = llm_vision.invoke([mensaje])
                 texto_vision = respuesta.content.strip()
                 
+                # Descartar ruido si el modelo obedeció
                 if "sin informacion" not in texto_vision.lower().replace("ó", "o"):
                     texto_consolidado += f"\n[DATOS EXTRAÍDOS DE IMAGEN INCRUSTADA]\n{texto_vision}\n\n"
             except Exception as e:
@@ -92,7 +132,14 @@ def procesar_correo_eml(ruta_archivo: str) -> str:
 
 def extraer_texto_universal(ruta_archivo: str) -> str:
     """
-    Lee un archivo (PDF, DOCX, XLSX, TXT, EML) y devuelve todo su contenido como texto plano.
+    Lee un archivo en múltiples formatos soportados (PDF, DOCX, XLSX, TXT, EML) 
+    y devuelve todo su contenido como texto crudo, aplicando limpieza de basura.
+    
+    Parámetros:
+    - ruta_archivo (str): Ruta completa o relativa al documento a leer.
+    
+    Retorna:
+    - str: El texto consolidado listo para inyectar en el `BotState`.
     """
     _, extension = os.path.splitext(ruta_archivo)
     extension = extension.lower()
@@ -133,3 +180,11 @@ def extraer_texto_universal(ruta_archivo: str) -> str:
     # ESTE ES NUESTRO MONITOR DE SALUD:
     print(f"📏 [Debug] Caracteres extraídos de {os.path.basename(ruta_archivo)}: {len(texto_completo)}")
     return texto_completo
+
+# ==========================================
+# METADATA
+# tools_used: [fitz, docx, pandas, email, bs4, base64, re, langchain_core]
+# use_cases: [Parseo OCR y de texto de archivos del cliente, Extirpación de basura binaria, Visión en correos]
+# reusable_components: [limpiar_basura_digital, extraer_texto_universal]
+# dependencies: [pip install PyMuPDF python-docx pandas beautifulsoup4 langchain-core]
+# ==========================================

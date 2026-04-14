@@ -1,3 +1,19 @@
+"""
+ctg.py - Agente de Características Técnicas Garantizadas (CTG).
+
+Propósito general:
+Este agente extrae las especificaciones obligatorias que el transformador debe cumplir 
+(pérdidas, impedancia, aislamiento) basándose en las potencias requeridas.
+
+Cuándo usarlo:
+Se llama desde el grafo general (`grafo.py`) en la fase de generación del archivo 
+Excel CTG, para producir una tabla transversal de toda una familia de transformadores.
+
+Requisitos:
+- El `BotState` debe tener `inventario_global` y `texto_extraido`.
+- Requiere configuración activa del `agente_ctg` en config.json.
+"""
+
 from langchain_core.prompts import ChatPromptTemplate
 from src.corelogic import get_llm
 from src.schemas.modelos import TablaCTGFamilia
@@ -27,6 +43,17 @@ TEXTO DEL PLIEGO Y CORREOS:
 """
 
 def nodo_generar_tablas_ctg(state: BotState):
+    """
+    Toma todo el texto del pliego y genera una matriz de Características Técnicas 
+    Garantizadas (CTG) agrupadas por familia de transformador y luego exportadas a Excel.
+
+    Parámetros:
+    - state (BotState): Diccionario de estado que almacena el `inventario_global` y `texto_extraido`.
+
+    Retorna:
+    - Una actualización parcial del estado: `{"rutas_tablas_ctg": [lista_de_rutas]}` 
+      que contiene dónde se guardaron los Excels.
+    """
     print("\n📊 [Agente CTG] Iniciando estructuración de Características Técnicas Garantizadas...")
     inventario = state.get("inventario_global", [])
     texto_crudo = state.get("texto_extraido", "")
@@ -38,7 +65,7 @@ def nodo_generar_tablas_ctg(state: BotState):
     # 1. Agrupar por familia (Ej: 'Padmounted', 'CSP')
     tipos_unicos = list(set([t["tipo_transformador"] for t in inventario if t["tipo_transformador"] != "No especificado"]))
 
-    # 2. Configurar el LLM estricto
+    # 2. Configurar el LLM estricto utilizando salidas estructuradas a pydantic
     llm = get_llm("agente_ctg")
     llm_estructurado = llm.with_structured_output(TablaCTGFamilia)
     prompt = ChatPromptTemplate.from_template(PROMPT_CTG)
@@ -55,7 +82,7 @@ def nodo_generar_tablas_ctg(state: BotState):
         kvas_tipo = [item["potencia"] for item in inventario if item["tipo_transformador"] == tipo]
         variantes_str = ", ".join(kvas_tipo)
 
-        # Invocar al modelo
+        # Invocar al modelo pasándole el listado de variantes de kVA
         resultado: TablaCTGFamilia = cadena.invoke({
             "tipo_transformador": tipo,
             "variantes_solicitadas": variantes_str,
@@ -67,3 +94,11 @@ def nodo_generar_tablas_ctg(state: BotState):
         rutas_generadas.append(ruta_excel)
 
     return {"rutas_tablas_ctg": rutas_generadas}
+
+# ==========================================
+# METADATA
+# tools_used: [langchain_core, datetime]
+# use_cases: [Extracción de garantias CTG transversal por variante, Llamado a exportador Excel]
+# reusable_components: [nodo_generar_tablas_ctg]
+# dependencies: [pip install langchain-core pydantic]
+# ==========================================

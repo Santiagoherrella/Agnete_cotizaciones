@@ -1,3 +1,19 @@
+"""
+state.py - Definición del Estado Global del Grafo (Memoria del Bot).
+
+Propósito general:
+Este módulo define el esquema `BotState` utilizando `TypedDict` y `Annotated`. 
+Sirve como la "memoria RAM" compartida entre todos los nodos y escuadrones del sistema.
+Todo agente lee de este estado y escribe sus resultados en él a medida que avanza el flujo.
+
+Cuándo usarlo:
+Se importa en la inicialización del `StateGraph` en `grafo.py` y se pasa como 
+parámetro a todas las funciones nodo (ej. `def nodo_extractor_electrico(state: BotState):`).
+
+Requisitos:
+- Librería `typing` y `operator`.
+"""
+
 from typing import TypedDict, List, Dict, Any, Annotated
 import operator
 
@@ -53,3 +69,11 @@ class BotState(TypedDict):
     fichas_tecnicas_finales: Annotated[List[Dict], operator.add]
     rutas_fichas_word: Annotated[List[str], operator.add]
     rutas_tablas_ctg: Annotated[List[str], operator.add] # Actualizado según tu test_martes.py
+
+# ==========================================
+# METADATA
+# tools_used: [typing, operator]
+# use_cases: [Gestión del estado de LangGraph, Pasaje de contexto entre agentes]
+# reusable_components: [BotState]
+# dependencies: []
+# ==========================================

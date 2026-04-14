@@ -1,3 +1,21 @@
+"""
+inventario.py - Agente enrutador y clasificador del inventario inicial.
+
+Propósito general:
+Identifica la naturaleza del documento analizado (correo informal vs. pliego técnico)
+y extrae la lista de transformadores que se deben cotizar (Cantidades, Potencias, Voltajes). 
+Sirve como el "Gatekeeper" de todo el sistema.
+
+Cuándo usarlo:
+Es el nodo de entrada absoluto (`extractor_inventario`) en `grafo.py`. Siempre se 
+ejecuta de primero, ya que sin un inventario de equipos el resto de nodos no tiene con qué operar.
+
+Requisitos:
+- El estado `BotState` con el campo `texto_extraido` lleno.
+- Modelos LLM configurados para `enrutador` y `agente_inventario`.
+- Output parser de langchain Pydantic (InventarioPedido).
+"""
+
 from langchain_core.prompts import ChatPromptTemplate
 from src.corelogic import get_llm
 from src.schemas.modelos import InventarioPedido, ClasificacionDocumento
@@ -71,6 +89,17 @@ TEXTO DEL CORREO:
 # LA FUNCIÓN DEL NODO (EL ENRUTADOR)
 # ==========================================
 def nodo_extraer_inventario(state: BotState):
+    """
+    Toma el texto extraído del documento, evalúa de manera heurística/semántica 
+    qué tipo de documento es (Correo o Pliego formal) y utiliza el prompt correspondiente
+    para extraer la lista inicial de objetos a cotizar.
+    
+    Parámetros:
+    - state (BotState): Estado que contiene `texto_extraido`.
+    
+    Retorna:
+    - Estado de inventario: `{"inventario_global": [lista_de_equipos_pydantic]}`
+    """
     texto_crudo = state.get("texto_extraido", "")
     if not texto_crudo:
          return {"inventario_global": []}
@@ -89,7 +118,9 @@ def nodo_extraer_inventario(state: BotState):
     
     tipo_doc = decision.tipo.upper() # Aseguramos que esté en mayúsculas
     print(f"🔀 [Enrutador] Decisión: El documento es un {tipo_doc}. Asignando especialista...")
+    
     # --- PASO B: ENRUTAR Y EXTRAER ---
+    # La escogencia del tipo documental define el comportamiento y tono del LLM.
     if tipo_doc == "CORREO":
         # Usamos un LLM con un poco más de temperatura para inferir mejor el lenguaje natural
         llm_extractor = get_llm("agente_inventario")
@@ -111,3 +142,11 @@ def nodo_extraer_inventario(state: BotState):
     print(f"✅ [Agente {tipo_doc}] ¡Éxito! Se encontraron {len(lista_inventario)} equipos.")
     
     return {"inventario_global": lista_inventario}
+
+# ==========================================
+# METADATA
+# tools_used: [langchain_core, os]
+# use_cases: [Clasificación de Documentos, Extracción Listado de Materiales (BOM)]
+# reusable_components: [nodo_extraer_inventario]
+# dependencies: [pip install langchain-core pydantic]
+# ==========================================

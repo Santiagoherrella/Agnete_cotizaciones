@@ -1,3 +1,22 @@
+"""
+escuadron_electrico.py - Agentes encargados de extraer y validar parámetros eléctricos.
+
+Propósito general:
+Este módulo contiene el extractor y el revisor correspondientes a la fase inicial del 
+diseño de transformadores (eléctrica). Su objetivo es identificar y validar voltajes, 
+frecuencias, impedancias, pérdidas y normativas explícitas en el pliego del cliente.
+
+Cuándo usarlo:
+Se ejecuta automáticamente como el primer paso técnico en `grafo.py` después de agrupar 
+por familia. El LLM extrae la data y el revisor la audita. Si falta la impedancia o el 
+BIL secundario (datos críticos), pide reintento.
+
+Requisitos:
+- El estado general (`BotState`) y la información del inventario.
+- Acceso a `get_llm("agente_electrico")`.
+- Modelos tipados de `DatosElectricos`.
+"""
+
 from langchain_core.prompts import ChatPromptTemplate
 from src.corelogic import get_llm
 from src.schemas.modelos import DatosElectricos
@@ -47,6 +66,17 @@ TEXTO DEL PLIEGO:
 # 2. EL NODO EXTRACTOR (El LLM)
 # ==========================================
 def nodo_extractor_electrico(state: BotState):
+    """
+    Busca e identifica los parámetros eléctricos primarios utilizando el LLM estructurado.
+    Si el nodo revisor dejó feedback previo, se inyecta como contexto adicional para forzar
+    al modelo a buscar minuciosamente.
+    
+    Parámetros:
+    - state (BotState): Estado global del grafo.
+    
+    Retorna:
+    - Diccionario con la clave "datos_electricos" mapeada al resultado (diccionario).
+    """
     print(f"⚡ [Extractor Eléctrico] Analizando {state['item_actual_id']} (Intento {state.get('intentos_electrico', 0) + 1})")
     
     texto_crudo = state.get("texto_extraido", "")
@@ -54,7 +84,8 @@ def nodo_extractor_electrico(state: BotState):
     item_id = state.get("item_actual_id", "")
     trafo_actual = next((t for t in inventario if t["item_id"] == item_id), None)
     
-    if not trafo_actual: return {"datos_electricos": {}}
+    if not trafo_actual: 
+        return {"datos_electricos": {}}
 
     # Si el revisor dejó feedback en un intento anterior, lo inyectamos como "lupa"
     feedback = state.get("feedback_electrico", "")
@@ -82,7 +113,16 @@ def nodo_extractor_electrico(state: BotState):
 # 3. EL NODO REVISOR (Código Python Puro = $0 Costo)
 # ==========================================
 def nodo_revisor_electrico(state: BotState):
-    """Audita el trabajo del Extractor y genera Alertas si es necesario."""
+    """
+    Audita el trabajo del Extractor Eléctrico y genera Alertas si es necesario.
+    Verifica que la `impedancia` y el `bil_primario` se hayan extraído.
+    
+    Parámetros:
+    - state (BotState): Estado global del grafo.
+    
+    Retorna:
+    - Actualización del estado (intentos consumidos, feedback y alertas en caso de fallback).
+    """
     datos = state.get("datos_electricos", {})
     intentos = state.get("intentos_electrico", 0)
     
@@ -103,7 +143,7 @@ def nodo_revisor_electrico(state: BotState):
         print(f"❌ [Revisor Eléctrico] Faltan datos. Solicitando reintento... ({msg})")
         return {"intentos_electrico": intentos + 1, "feedback_electrico": msg}
     
-    # ESCENARIO C: Fallback (Alertas de Diseño)
+    # ESCENARIO C: Fallback (Alertas de Diseño generadas sin LLM)
     print(f"⚠️ [Revisor Eléctrico] Intentos agotados. Generando alerta para: {', '.join(faltan_datos)}")
     nuevas_alertas = []
     if "impedancia" in faltan_datos:
@@ -121,10 +161,20 @@ def nodo_revisor_electrico(state: BotState):
 # 4. EL ENRUTADOR (Conditional Edge para LangGraph)
 # ==========================================
 def decidir_ruta_electrico(state: BotState):
-    """Le dice a LangGraph a dónde ir después de la revisión."""
+    """
+    Le dice a LangGraph a dónde ir después de la revisión (avanzar a mecánico o iterar).
+    """
     estado_revision = state.get("feedback_electrico", "")
     
     if "APROBADO" in estado_revision:
         return "fin_electrico"  # Ya sea puro o con fallback, terminó exitosamente.
     else:
         return "reintentar_electrico" # Vuelve al nodo extractor
+
+# ==========================================
+# METADATA
+# tools_used: [langchain_core]
+# use_cases: [Extracción parámetros eléctricos, Regulación/Auditoría en Grafo, Prompt con lupa de feedback]
+# reusable_components: [nodo_extractor_electrico, nodo_revisor_electrico]
+# dependencies: [pip install langchain-core pydantic]
+# ==========================================
