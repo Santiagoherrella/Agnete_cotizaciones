@@ -30,12 +30,13 @@ El sistema está orquestado con `LangGraph`, funcionando como una verdadera lín
 * **🕵️‍♂️ Enrutador de Documentos:** Evalúa si el documento subido es un Pliego Técnico real o "basura" (Ej: correos de seguimiento). Si es pliego, autoriza el arranque.
 * **📋 Agente de Inventario:** Escanea el pliego y extrae la lista exacta de transformadores solicitados (Cantidades, kVA, Voltajes y Familia).
 
-### Fase 3: Los 4 Escuadrones (Mapeo Granular)
-Cada familia de transformadores (Ej: *CSP*, *Padmounted*) pasa por 4 escuadrones compuestos por un **Extractor** y un **Revisor (Crítico)**. Utilizan modelos de datos estrictos (`Pydantic`) para forzar la extracción de variables específicas (ej. *perforaciones en aisladores BT*, *desfase angular*):
+### Fase 3: Los 5 Escuadrones (Mapeo Granular)
+Cada familia de transformadores (Ej: *CSP*, *Padmounted*) pasa por 5 escuadrones compuestos por un **Extractor** y un **Revisor (Crítico)**. Utilizan modelos de datos estrictos (`Pydantic`) para forzar la extracción de variables específicas (ej. *perforaciones en aisladores BT*, *desfase angular*):
 1.  **⚡ Escuadrón Eléctrico:** Impedancias, voltajes, BIL, grupos de conexión.
 2.  **🔩 Escuadrón Mecánico:** Pintura, refrigeración (KNAN), núcleos, dimensiones.
 3.  **🧰 Escuadrón Accesorios:** Pararrayos, CTs, válvulas, placas de características.
 4.  **🚚 Escuadrón Logístico:** Normativa (ANSI/IEEE), embalaje, multas e Incoterms.
+5.  **💼 Escuadrón Comercial:** Condiciones generales, formas de pago, garantías, pólizas y evaluación económica.
 
 ### Fase 4: Aduana de Integridad y HITL (Human-in-the-Loop)
 Ates de generar cualquier archivo de ingeniería, un **Agente Auditor SDM** verifica que existan los datos críticos obligatorios (ej. Impedancia,BIL, Tipo de Aceite).
@@ -48,7 +49,7 @@ Si el pliego es omiso, el flujo se detiene y activa un nodo de **Intervención H
 La orquestación funciona mediante un **Supervisor por Familias**:
 1. El sistema genera el *Inventario Global*.
 2. El Supervisor toma la primera "Familia" encontrada (Ej: Transformadores Convencionales).
-3. Pasa la batuta secuencialmente por los 4 Escuadrones.
+3. Pasa la batuta secuencialmente por los 5 Escuadrones.
 4. Genera los entregables de esa familia.
 5. Repite el ciclo con la siguiente familia hasta terminar.
 
@@ -67,8 +68,17 @@ Una decisión arquitectónica clave del proyecto fue separar la información cua
 * **Generación:** Posee un *Cerebro LLM Independiente* de alta capacidad (gpt-5.4/equivalente).
 * **Mapeo 1 a 1:** Toma la lista exacta de equipos del inventario y fuerza al modelo a extraer de las tablas del pliego las **Pérdidas en vacío, Pérdidas con carga y Fases** específicas para cada kVA. No alucina voltajes porque los cruza directamente con el Excel de Inventario inicial.
 
-### C. Archivo de Interfaz de Diseño (JSON SDM) - *Conexión con herramientas de Ingeniería*
-Un archivo estructurado (`.json`) generado individualmente por cada transformador detectado en el inventario. Contiene los parámetros de diseño limpios y normalizados, listos para ser importados automáticamente por el Software de Diseño Magnetron (SDM), eliminando la re-digitación manual.
+### 💾 C. Archivo de Interfaz de Diseño (JSON SDM) - *Conexión con herramientas de Ingeniería*
+* **Objetivo:** Conexión con herramientas de Ingeniería y eliminación de la re-digitación manual.
+* **Generación:** Un archivo estructurado (`.json`) generado individualmente por cada transformador detectado en el inventario.
+* **Resultado:** Contiene los parámetros de diseño limpios y normalizados, listos para ser importados automáticamente por el Software de Diseño Magnetron (SDM).
+
+### 💼 D. Checklist y Resumen Comercial - *Evaluación de Licitación*
+* **Objetivo:** Definir las condiciones comerciales de la oferta (garantías, pólizas, penalidades, multas, tiempos de entrega, etc.).
+* **Generación:** Procesado por el `escuadron_comercial` y exportado mediante el `exportador_comercial`.
+* **Resultado:** 
+  - **Resumen Ejecutivo Comercial (Word):** Análisis narrativo del pliego.
+  - **Checklist Comercial (Excel):** Tabla estructurada con las condiciones de evaluación económica y legal, lista para la toma de decisiones comerciales.
 ---
 
 ## 🛠️ 6. Stack Tecnológico
