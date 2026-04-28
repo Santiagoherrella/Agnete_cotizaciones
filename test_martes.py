@@ -28,9 +28,14 @@ def ejecutar_prueba_maestra():
         print(f"📖 Leyendo: {arc}...")
         texto_total += f"\n\n--- DOCUMENTO: {arc} ---\n"
         texto_total += extraer_texto_universal(os.path.join(carpeta_inputs, arc))
-
+    
     # 3. Preparar la Tarjeta Viajera
     estado_inicial: BotState = {
+        "configuracion": { # Datos que vamos a extraer
+            "ejecutar_ingenieria": True,
+            "ejecutar_comercial": False,
+            "ejecutar_sdm": False
+        },
         "ruta_documento": "PROYECTO_PEA_RIVER_BATCH",
         "texto_extraido": texto_total,
         "inventario_global": [],

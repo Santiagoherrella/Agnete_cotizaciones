@@ -37,6 +37,10 @@ Cada familia de transformadores (Ej: *CSP*, *Padmounted*) pasa por 4 escuadrones
 3.  **🧰 Escuadrón Accesorios:** Pararrayos, CTs, válvulas, placas de características.
 4.  **🚚 Escuadrón Logístico:** Normativa (ANSI/IEEE), embalaje, multas e Incoterms.
 
+### Fase 4: Aduana de Integridad y HITL (Human-in-the-Loop)
+Ates de generar cualquier archivo de ingeniería, un **Agente Auditor SDM** verifica que existan los datos críticos obligatorios (ej. Impedancia,BIL, Tipo de Aceite).
+Si el pliego es omiso, el flujo se detiene y activa un nodo de **Intervención Humana**, permitiendo al usuario ingresar los datos faltantes por consola para reanudar el proceso sin perder el trabajo previo.
+
 ---
 
 ## ⚙️ 4. Flujo de Trabajo Automatizado (Pipeline)
@@ -53,7 +57,6 @@ La orquestación funciona mediante un **Supervisor por Familias**:
 ## 📦 5. Entregables Desacoplados (Macro vs. Micro)
 
 Una decisión arquitectónica clave del proyecto fue separar la información cualitativa de la cuantitativa para proteger la matriz comercial. "La precisión vale más que el ahorro de tokens".
-
 ### 📄 A. Resumen Ejecutivo (El Word) - *Visión Macro*
 * **Objetivo:** Brindar contexto al diseñador.
 * **Generación:** Determinista mediante `python-docx` puro. Ensambla los JSON previamente validados por los escuadrones y los limpia de caracteres basura OCR.
@@ -64,6 +67,8 @@ Una decisión arquitectónica clave del proyecto fue separar la información cua
 * **Generación:** Posee un *Cerebro LLM Independiente* de alta capacidad (gpt-5.4/equivalente).
 * **Mapeo 1 a 1:** Toma la lista exacta de equipos del inventario y fuerza al modelo a extraer de las tablas del pliego las **Pérdidas en vacío, Pérdidas con carga y Fases** específicas para cada kVA. No alucina voltajes porque los cruza directamente con el Excel de Inventario inicial.
 
+### C. Archivo de Interfaz de Diseño (JSON SDM) - *Conexión con herramientas de Ingeniería*
+Un archivo estructurado (`.json`) generado individualmente por cada transformador detectado en el inventario. Contiene los parámetros de diseño limpios y normalizados, listos para ser importados automáticamente por el Software de Diseño Magnetron (SDM), eliminando la re-digitación manual.
 ---
 
 ## 🛠️ 6. Stack Tecnológico
@@ -180,6 +185,15 @@ Una vez que el sistema finaliza, genera dos entregables clave:
 
 ## 📝 12. CHANGELOG
 
+* **2026-04-28 | `1dbb604`:** CUS2024-018 - Fix lógica de enrutamiento para SDM y documentos técnicos, resolución de bucle infinito en supervisor
+* **2026-04-27 | `2040e62`:** CUS2024-017 - WIP: Implementacion de enrutamiento modular con flags booleanos y flujo comercial independiente
+* **2026-04-26 | `51051a7`:** CUS2024-017 - Integración de Escuadrón Comercial con generación independiente de Word y Excel
+* **2026-04-25 | `a635694`:** CUS2024-016 - Generacion dinamica de JSON SDM individuales por cada transformador del inventario y se organizaron los prompts para que traiga la información en español
+* **2026-04-23 | `06fdf46`:** CUS2024-015 - Integración de Agente Auditor SDM, Intervención Humana (HITL) por terminal y generación de interfaz de datos JSON para software de diseño.
+* **2026-04-22 | `9d60b88`:** CUS2024-014 - Documentación exhaustiva del repositorio: Metadata YAML, docstrings detallados y estandarización de módulos core.
+* **2026-04-21 | `f685dfd`:** CUS2024-013 - Definición de arquitectura MECE y manual de usuario inicial.
+* **2026-04-21 | `7c69f87`:** CUS2024-012 - Ajustes finales en validación de modelos Pydantic y lógica de variantes en el generador CTG.
+* **2026-04-20 | `b51809f`:** CUS2024-011 - Refactorización del Ensamblaje Final. Implementación de "Cerebro Independiente" para CTG y limpieza de caracteres basura OCR.
 * **2026-04-08 | `7c69f87`:** CUS2024-012 - Ajustes finales en modelos y generador CTG
 * **2026-04-07 | `b51809f`:** CUS2024-011 - Refactorización del Ensamblaje Final (Word y Excel CTG)
   * Rediseño de `exportador.py`: Creación de un "Cerebro Independiente" para el CTG que utiliza el modelo de alta capacidad para lectura granular de tablas de pérdidas y fases.
