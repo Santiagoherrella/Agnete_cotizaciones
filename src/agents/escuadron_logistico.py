@@ -30,6 +30,9 @@ Extrae ÚNICAMENTE la información COMERCIAL, LOGÍSTICA y JURÍDICA que aplica 
 EQUIPO: {tipo_transformador}
 
 INSTRUCCIONES CRÍTICAS:
+- IDIOMA OBLIGATORIO: Todo el texto extraído y generado DEBE estar 100% en ESPAÑOL TÉCNICO. 
+- TRADUCCIÓN: Si el pliego original está en inglés, traduce las frases y descripciones al español (Ej: de "Solidly Grounded" a "Sólidamente Aterrizado", de "Mild Steel" a "Acero Dulce").
+- EXCEPCIONES: NO traduzcas las siglas universales de ingeniería (ONAN, ONAF, kVA, BIL, IEEE, UL, ANSI, EXW) ni los nombres propios.
 - En cada sección, SOLO incluye información que esté especificada en el pliego. 
 - NO escribas "No especificado" en cada punto; simplemente omite los datos no disponibles. 
 - Incluye valores numéricos concretos con sus unidades. 
@@ -39,55 +42,35 @@ INSTRUCCIONES CRÍTICAS:
 - Si el pliego tiene imágenes, descríbelas e indica que hay en ellas. 
 - NO generes tablas en este resumen. Las tablas se crearán automáticamente por separado.  
 
-1. CONDICIONES GENERALES  
-   (Solo incluir los datos disponibles sobre): 
-    1.1. Fecha de presentación de la oferta 
-    1.2. Indica la hora Colombia de presentación, realiza conversión a UTC -5  
-    1.3. Identifica en el pliego el método de presentación de la oferta Ejemplo: Correo electrónico, Portal, Correspondencia física.  
-        1.3.1. Si es correo electrónico 
-            1.3.1.1 Identifica la dirección de correo electrónico para envío de la oferta   
-        1.3.2. Si es portal.
-            1.3.2.1. Identifica el link de cargue de la documentación de la oferta  
-        1.3.3. Si es por Correspondencia física: 
-            1.3.3.1. Identifica si requieren Firma en tinta, puño y letra 
-            1.3.3.2.Identifica si tiene requerimiento especial.  
-            1.3.3.3. Identifica si requieren Firma escaneada o certificada 
-            1.3.3.4. Identifica si se debe notarizar documentos firmados 
-    1.4. Fecha límite de consultas  
-    1.5. Método de envío de consultas 
-        1.5.1 Identifica si existe un formato o estructuración especifica para consultas     
-        1.5.2. Identifica si el cliente tiene consultas comerciales y/o técnicas y enuméralas en orden de prioridad.   
-    1.6. Identifica si aceptan presentación de oferta parcial  
-    1.7. Identifica si permiten desviaciones o excepciones técnicas  
-    1.8. Identifica si permiten desviaciones o excepciones comerciales 
+NORMATIVA Y CERTIFICACIONES
+(Listar SOLO las normas mencionadas explícitamente):
+   - Estándares aplicables con número y título completo
+   - Pruebas y ensayos requeridos
+   - Certificaciones exigidas
+   - Requisitos sísmicos específicos
+   - Normativa para materiales específicos
 
- 2. EXTRAER CONDICIONES COMERCIALES  
-     2.1. Forma de Pago.
-     2.2. Validez de la oferta
-     2.3. Moneda
-     2.4. Duración del suministro
-     2.5. Tiempo de entrega requerido
-     2.6. Permite formula de reajuste de precio
-     2.7. Identifica si se debe anexar fianza de seriedad de la oferta
-     2.8. Detalla requerimiento sobre pólizas y seguros aplicables
-     2.9. Identifica si hay requisito de estampillas e impuestos 		 
-3. EXTRAER REVISION JURIDICA
-    3.1. Anexos minuta de contrato o términos de contratación.
-    3.2. Penalizaciones o multas
-4. EXTRAER CERTIFICACIONES 
-   4.1 Certificaciones exigidas
-5. EXTRAER PRESENTACION DE LA DOCUMENTACIÓN DE LA OFERTA 
-    5.1. Solicitud índice y paginado
-    5.2. Solicitud Formato de los archivos
-6. EXTRAER INFORMACION SOBRE ENTREGAS
-    6.1. Lugar entrega – Zip code
-    6.2. Incoterm .
-    6.3. Condiciones de transporteCondiciones especiales sobre horarios de entrega 
-7. EXTRAER ENTREGABLES DE LA OFERTA 
+IDENTIFICACIÓN, ROTULADO Y DOCUMENTACIÓN
 (Solo incluir datos disponibles):
-    7.1. Planos requeridos
-    7.2. Formularios exigidos
-    7.3. Declaración de pérdidas 
+   - Requisitos de placas de características. (cantidad y cuando estas son abligatorias)
+   - Etiquetado y marcación especial
+   - Documentación técnica requerida
+   - Planos y manuales solicitados
+   - Idioma para documentación
+
+EMBALAJE Y TRANSPORTE
+(Solo incluir datos disponibles):
+   - Tipo de embalaje requerido
+   - Materiales específicos
+   - Requisitos de preservación
+   - Condiciones de transporte
+   - Preparación para manejo
+
+ENTREGABLES DE LA OFERTA
+(Solo incluir datos disponibles):
+   - Planos requeridos
+   - Pruebas específicas
+   - Declaración de pérdidas
 {bloque_feedback}
 
 TEXTO DEL PLIEGO:

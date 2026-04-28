@@ -10,6 +10,17 @@ from src.agents.escuadron_mecanico import nodo_extractor_mecanico, nodo_revisor_
 from src.agents.escuadron_accesorios import nodo_extractor_accesorios, nodo_revisor_accesorios, decidir_ruta_accesorios
 from src.agents.escuadron_logistico import nodo_extractor_logistico, nodo_revisor_logistico, decidir_ruta_logistico
 
+from src.agents.auditor_sdm import nodo_auditor_sdm
+from src.tools.exportador_sdm import nodo_generar_json_sdm
+
+from src.agents.intervencion_humana import nodo_human_in_the_loop, decidir_ruta_auditor
+
+from src.agents.agente_comercial import nodo_analista_comercial, nodo_tabulador_comercial
+from src.tools.exportador_comercial import nodo_word_comercial, nodo_excel_comercial
+
+from src.agents.configuraciones import validador_inicial, router_ingenieria, router_comercial, router_sdm
+from src.agents.supervisor import nodo_supervisor_familias
+
 """
 ESTRUCTURA DEL GRAFO (WORKFLOW)
 ===============================
@@ -24,52 +35,18 @@ PASOS PRINCIPALES:
 4. Ensamblado y Cierre: Genera reportes (Word/Excel) y vuelve al Supervisor para la siguiente familia.
 """
 
-# =============================================================================
-# EL SUPERVISOR (Controlador de Iteraciones por Familias)
-# =============================================================================
-def nodo_supervisor_familias(state: BotState):
-    """
-    Actúa como el cerebro del flujo. Decide qué familia de transformadores procesar a continuación.
-    Si ya no quedan familias pendientes, marca el fin del proceso.
-    """
-    inventario = state.get("inventario_global", [])
-    completados = state.get("resumenes_completados", [])
-    
-    # 1. Identificar qué tipos de transformadores (familias) existen en el documento
-    familias_unicas = list(set([t["tipo_transformador"] for t in inventario if t.get("tipo_transformador") != "No especificado"]))
-    
-    # 2. Buscar si hay alguna familia que aún no haya sido procesada
-    familia_pendiente = None
-    item_representativo = None
-    
-    for familia in familias_unicas:
-        if familia not in completados:
-            familia_pendiente = familia
-            # Seleccionamos un ítem de esta familia para que sirva de guía en la búsqueda de datos
-            item_representativo = next(t["item_id"] for t in inventario if t["tipo_transformador"] == familia)
-            break
-            
-    # 3. Si no hay familias pendientes, terminamos el flujo global
-    if not familia_pendiente:
-        print(f"\n👨‍💼 [Supervisor] ¡Todas las familias procesadas! Terminando flujo.")
-        return {"item_actual_id": "FIN"}
-        
-    print(f"\n👨‍💼 [Supervisor] Iniciando análisis para la Familia: {familia_pendiente} (Usando ref: {item_representativo})")
-    
-    # Reiniciamos las variables de control para que los agentes empiecen "limpios" con la nueva familia
-    return {
-        "item_actual_id": item_representativo, 
-        "intentos_electrico": 0, "intentos_mecanico": 0, "intentos_accesorios": 0, "intentos_logistico": 0,
-        "feedback_electrico": "", "feedback_mecanico": "", "feedback_accesorios": "", "feedback_logistico": "",
-        "alertas_diseno": [],
-        "datos_electricos": {}, "datos_mecanicos": {}, "datos_accesorios": {}, "datos_logisticos": {}
-    }
-
-def enrutar_supervisor(state: BotState):
-    """ Función lógica que decide si ir al primer escuadrón o terminar. """
+def decidir_salida_supervisor(state: BotState):
+    """Decide si el supervisor tiene más trabajo o si ya terminamos todo."""
     if state.get("item_actual_id") == "FIN":
-        return END 
-    return "extractor_electrico"
+        return "finalizar"
+    return "procesar_familia"
+
+def decidir_bypass_comercial(state: BotState):
+    """Consulta si debe ir a comercial o saltar directo a ingeniería."""
+    config = state.get("configuracion", {})
+    if config.get("modo") == "solo_ingenieria":
+        return "saltar_a_ingenieria"
+    return "ir_a_comercial"
 
 # =============================================================================
 # CONSTRUCCIÓN DEL FLUJO (Definición de Nodos y Conexiones)
@@ -97,23 +74,45 @@ flujo.add_node("revisor_accesorios", nodo_revisor_accesorios)
 flujo.add_node("extractor_logistico", nodo_extractor_logistico)
 flujo.add_node("revisor_logistico", nodo_revisor_logistico)
 
-# Fase de Cierre: Generación de Entregables por Familia
+# Generación de Entregables Técnicos por Familia
 flujo.add_node("ensamblador_word", nodo_generar_resumen_tipo) # Crea el informe Word consolidado
 flujo.add_node("creador_ctg", nodo_crear_excel_ctg) # Genera el Excel detallado para CTG
+
+# Generación de Entregables Comerciales
+flujo.add_node("analista_comercial", nodo_analista_comercial) # Agente de resumen ejecutivo
+flujo.add_node("tabulador_comercial", nodo_tabulador_comercial) # Agente de checklist
+flujo.add_node("ensamblador_comercial_word", nodo_word_comercial)  # Genera el informe Word comercial
+flujo.add_node("exportador_comercial_excel", nodo_excel_comercial) # Genera el Excel comercial 
+
+# Generación de JSON para el Software SDM
+flujo.add_node("auditor_sdm", nodo_auditor_sdm) # Auditor de SDM
+flujo.add_node("generador_sdm", nodo_generar_json_sdm) # Generador de  JSON SDM
+
+# Agregamos el nodo humano
+flujo.add_node("intervencion_humana", nodo_human_in_the_loop) # Intervención humana
+
+flujo.add_node("validador_inicial", validador_inicial) # Validador inicial
+flujo.add_node("router_ingenieria", router_ingenieria) # Router de ingeniería
+flujo.add_node("router_comercial", router_comercial) # Router comercial
+flujo.add_node("router_sdm", router_sdm) # Router SDM   
 
 # --- DEFINICIÓN DE ARISTAS (EDGES) ---
 # Aquí se define el "camino" que sigue la información.
 
-# 1. Punto de entrada y flujo inicial
-flujo.set_entry_point("extractor_inventario")
+# 1. Validación de seguridad ANTES de arrancar
+flujo.set_conditional_entry_point(validador_inicial, {
+    "abortar": END,
+    "continuar": "extractor_inventario"
+})
+
 flujo.add_edge("extractor_inventario", "creador_excel_global")
 flujo.add_edge("creador_excel_global", "supervisor")
 
-# 2. El Supervisor decide si empezar con los escuadrones o terminar
-flujo.add_conditional_edges("supervisor", enrutar_supervisor)
-
-# 3. SECUENCIA DE ESCUADRONES (Lógica: Extraer -> Revisar -> (Loop si hay error) -> Siguiente Escuadrón)
-
+flujo.add_conditional_edges("supervisor", router_ingenieria, {
+        "finalizar": END,
+        "ir_a_ingenieria": "extractor_electrico",
+        "saltar_a_comercial": "analista_comercial"
+    })
 # Escuadrón Eléctrico: Luego de revisar, o reintenta o pasa al Mecánico
 flujo.add_edge("extractor_electrico", "revisor_electrico")
 flujo.add_conditional_edges("revisor_electrico", decidir_ruta_electrico, {
@@ -135,16 +134,47 @@ flujo.add_conditional_edges("revisor_accesorios", decidir_ruta_accesorios, {
     "fin_accesorios": "extractor_logistico"
 })
 
-# Escuadrón Logístico/Comercial: Al terminar, pasa al Ensamblador de Word
+# Escuadrón Logístico/Comercial
 flujo.add_edge("extractor_logistico", "revisor_logistico")
-flujo.add_conditional_edges("revisor_logistico", decidir_ruta_logistico, {
-    "reintentar_logistico": "extractor_logistico",
-    "fin_logistico": "ensamblador_word"
+
+
+# 3. Salida de Logístico -> Comercial, SDM, o Documentos Finales
+flujo.add_conditional_edges("revisor_logistico", router_comercial, {
+    "reintentar": "extractor_logistico",
+    "ir_a_comercial": "analista_comercial",
+    "saltar_a_sdm": "auditor_sdm",
+    "saltar_a_documentos_tecnicos": "ensamblador_word",
+    "terminar_familia": "supervisor"
 })
 
-# 4. Generación de informes y retorno al Supervisor para la siguiente familia
-flujo.add_edge("ensamblador_word", "creador_ctg") # Word generado -> Excel CTG generado
-flujo.add_edge("creador_ctg", "supervisor")       # Familia terminada -> Volver al jefe para ver si hay más
+# Flujo Comercial Secuencial
+flujo.add_edge("analista_comercial", "tabulador_comercial")
+flujo.add_edge("tabulador_comercial", "ensamblador_comercial_word")
+flujo.add_edge("ensamblador_comercial_word", "exportador_comercial_excel")
+
+# Una vez generados los documentos comerciales, volvemos al flujo de ingeniería (SDM)
+# 4. Salida de Comercial -> SDM, Documentos Finales, o Supervisor
+flujo.add_conditional_edges("exportador_comercial_excel", router_sdm, {
+    "ir_a_sdm": "auditor_sdm",
+    "saltar_a_documentos_tecnicos": "ensamblador_word", 
+    "terminar_familia": "supervisor" 
+})
+
+
+# 2. El Auditor decide si va al SDM o pide ayuda
+flujo.add_conditional_edges("auditor_sdm", decidir_ruta_auditor, {
+    "ir_a_sdm": "generador_sdm",
+    "pedir_ayuda_humana": "intervencion_humana"
+})
+
+# 3. El humano reanuda hacia el SDM
+flujo.add_edge("intervencion_humana", "generador_sdm")
+
+# 4. Secuencia final estricta de documentos
+flujo.add_edge("generador_sdm", "ensamblador_word")
+flujo.add_edge("ensamblador_word", "creador_ctg")
+flujo.add_edge("creador_ctg", "supervisor")
+
 
 # --- COMPILACIÓN ---
 maquina_magnetron = flujo.compile()

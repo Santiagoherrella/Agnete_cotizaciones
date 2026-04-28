@@ -57,13 +57,21 @@ class DatosElectricos(BaseModel):
     condiciones_servicio: DatoValidado = Field(description="Condiciones de servicio")
     
     # SECCIÓN 2: ELÉCTRICOS
-    voltajes_nominales: DatoValidado = Field(description="Voltajes nominales (primario/secundario) y configuración")
+    voltaje_primario: DatoValidado = Field(description="Voltaje primario")
+    configuracion_VP: DatoValidado = Field(description="configuracion del voltaje primario")
+    bil_primario: DatoValidado = Field(description="BIL (Nivel Básico de Aislamiento primario")
+    voltaje_secundario: DatoValidado = Field(description="Voltaje secundario")
+    configuracion_VS: DatoValidado = Field(description="configuracion del voltaje secundario")
+    bil_secundario: DatoValidado = Field(description="BIL (Nivel Básico de Aislamiento secundario")
     frecuencia: DatoValidado = Field(description="Frecuencia de operación")
     grupo_conexion_desfase: DatoValidado = Field(description="Grupo de conexión e información de desfase (Ej: 30°)")
     impedancia_cortocircuito: DatoValidado = Field(description="Impedancia de cortocircuito (%)")
     regulacion_taps: DatoValidado = Field(description="Regulación de tensión (taps)")
     nivel_perdidas_maximas: DatoValidado = Field(description="Nivel de pérdidas máximas permitidas. (Aclarar si es doble voltaje)")
-    bil_primario_secundario: DatoValidado = Field(description="BIL (Nivel Básico de Aislamiento) primario y secundario")
+    perdidas_carga: DatoValidado = Field(description="Nivel de pérdidas con carga")
+    perdidas_no_carga: DatoValidado = Field(description="Nivel de pérdidas sin carga")
+    perdidas_totales: DatoValidado = Field(description="Nivel de pérdidas totales")
+    eficiencia: DatoValidado = Field(description="Nivel de eficiencia")
 
 class DatosMecanicos(BaseModel):
     # SECCIÓN 3: CONSTRUCTIVAS
@@ -78,6 +86,9 @@ class DatosMecanicos(BaseModel):
     requisitos_sismicos: DatoValidado = Field(description="Requisitos sísmicos")
     dimensiones_peso_limites: DatoValidado = Field(description="Dimensiones y peso límites")
     radiadores_enfriamiento: DatoValidado = Field(description="Radiadores y sistemas de enfriamiento")
+    alto_especifico: DatoValidado = Field(description="Alto del transformador")
+    ancho_especifico: DatoValidado = Field(description="Ancho del transformador")
+    largo_especifico: DatoValidado = Field(description="Largo del transformador")
     
     # SECCIÓN 4: PINTURA
     preparacion_superficial: DatoValidado = Field(description="Preparación superficial requerida")
@@ -109,7 +120,7 @@ class DatosLogisticos(BaseModel):
     normas_aplicables: DatoValidado = Field(description="Estándares aplicables con número y título completo (IEEE/ANSI)")
     pruebas_ensayos: DatoValidado = Field(description="Pruebas, ensayos requeridos y certificaciones exigidas")
     penalizaciones_multas: DatoValidado = Field(description="Penalizaciones, multas o anexos jurídicos")
-    
+    certificacion_ul: DatoValidado = Field(description="Indica si se requiere sello o certificación UL. Extrae el texto exacto o pon 'No especificado'.")
     # SECCIÓN 8 Y 9: EMBALAJE Y ENTREGABLES
     tipo_embalaje_preservacion: DatoValidado = Field(description="Tipo de embalaje, materiales, y requisitos de preservación")
     condiciones_transporte: DatoValidado = Field(description="Condiciones de transporte y horarios de entrega")
@@ -139,6 +150,28 @@ class VarianteCTG(BaseModel):
 class TablaCTGFamilia(BaseModel):
     tipo_transformador: str = Field(description="Tipo de transformador")
     variantes: List[VarianteCTG] = Field(description="Lista de variantes, UNA POR CADA EQUIPO solicitado")
+
+class DatosSDM(BaseModel):
+    # Campos extraídos de tu archivo "Dotosingresosdms.xlsx"
+    pais: str = Field(default="Colombia")
+    norma: str
+    tipo_transformador: str
+    potencia_kva: float
+    voltaje_primario: float
+    bil_primario: float
+    voltaje_secundario: float
+    bil_secundario: float
+    impedancia_objetivo: float
+    tipo_aceite: str
+    material_conductor: str # Cobre / Aluminio
+    perdidas_vacio_max: Optional[float]
+    perdidas_carga_max: Optional[float]
+    eficiencia_min: Optional[float]
+
+class ReporteAuditoriaSDM(BaseModel):
+    aprobado_para_sdm: bool = Field(description="¿Tiene el 100% de los datos para el software de diseño?")
+    campos_faltantes: List[str] = Field(description="Lista de campos técnicos vacíos")
+    observaciones: str = Field(description="Explicación técnica de qué falta")
 
 # ==========================================
 # METADATA
