@@ -1,6 +1,7 @@
 #venv\Scripts\activate
 # pip install -r requirements.txt 
 # deactivate
+# "venv\Scripts\python.exe" -m 
 #python -m venv venv 
 #"text-embedding-3-large"
 #"gemini-embedding-001"
@@ -12,4 +13,4 @@
 # git checkout -b SHLl_desarrollo
 # git push -u origin SHLl_desarrollo
 # git add .
-# git commit -m "CUS2024-00X:Describimos los cambios"
+# git commit -m "CUS2024-019: Integración de Alineador Normativo y motor de mapeo relacional SDM"

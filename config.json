@@ -1,47 +1,47 @@
 {
     "vision": {
         "llm_provider": "openai",
-        "llm_model": "gpt-5.4",
+        "llm_model": "gpt-5.4-mini-2026-03-17",
         "temperature": 0.0
     },
     "enrutador": {
         "llm_provider": "openai",
-        "llm_model": "gpt-5.4-mini",
+        "llm_model": "gpt-5.4-mini-2026-03-17",
         "temperature": 0.0
     },
     "agente_inventario": {
         "llm_provider": "openai",
-        "llm_model": "gpt-5.4-mini",
+        "llm_model": "gpt-5.4-mini-2026-03-17",
         "temperature": 0.0
     },
     "agente_resumen": {
         "llm_provider": "openai",
-        "llm_model": "gpt-5.4",
+        "llm_model": "gpt-5.4-mini-2026-03-17",
         "temperature": 0.7
     },
     "agente_electrico": {
         "llm_provider": "openai",
-        "llm_model": "gpt-5.4-mini",
+        "llm_model": "gpt-5.4-mini-2026-03-17",
         "temperature": 0.0
     },
     "agente_mecanico": {
         "llm_provider": "openai",
-        "llm_model": "gpt-5.4-mini",
+        "llm_model": "gpt-5.4-mini-2026-03-17",
         "temperature": 0.0
     },
     "agente_accesorios": {
         "llm_provider": "openai",
-        "llm_model": "gpt-5.4-mini",
+        "llm_model": "gpt-5.4-mini-2026-03-17",
         "temperature": 0.0
     },
     "agente_ctg": {
         "llm_provider": "openai",
-        "llm_model": "gpt-5.4-mini",
+        "llm_model": "gpt-5.4-mini-2026-03-17",
         "temperature": 0.0
     },
     "agente_logistico": {
         "llm_provider": "openai",
-        "llm_model": "gpt-5.4-mini",
+        "llm_model": "gpt-5.4-mini-2026-03-17",
         "temperature": 0.0
     }
 }

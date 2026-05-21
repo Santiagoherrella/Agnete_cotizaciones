@@ -3,6 +3,7 @@
 ![Estado](https://img.shields.io/badge/Estado-En_Pruebas-success)
 ![Arquitectura](https://img.shields.io/badge/Arquitectura-LangGraph_Multi--Agent-blue)
 ![Precisión](https://img.shields.io/badge/Precisi%C3%B3n-Granular-orange)
+![Database](https://img.shields.io/badge/Database-Oracle_11g-red)
 
 ## 📖 1. Visión General del Proyecto
 
@@ -70,8 +71,8 @@ Una decisión arquitectónica clave del proyecto fue separar la información cua
 
 ### 💾 C. Archivo de Interfaz de Diseño (JSON SDM) - *Conexión con herramientas de Ingeniería*
 * **Objetivo:** Conexión con herramientas de Ingeniería y eliminación de la re-digitación manual.
-* **Generación:** Un archivo estructurado (`.json`) generado individualmente por cada transformador detectado en el inventario.
-* **Resultado:** Contiene los parámetros de diseño limpios y normalizados, listos para ser importados automáticamente por el Software de Diseño Magnetron (SDM).
+* **Generación:** Un archivo estructurado (`.json`) generado individualmente por cada transformador detectado en el inventario. Posee **conexión en vivo con Oracle 11g** (vía `oracledb` Thick Mode), mapeando el texto crudo del pliego a IDs relacionales oficiales del sistema de diseño (`IDKVA`, `IDVP`, `IDNORMA`).
+* **Resultado:** Contiene los parámetros de diseño limpios, normalizados y cruzados contra la base de datos relacional de planta, listos para ser importados automáticamente por el Software de Diseño Magnetron (SDM).
 
 ### 💼 D. Checklist y Resumen Comercial - *Evaluación de Licitación*
 * **Objetivo:** Definir las condiciones comerciales de la oferta (garantías, pólizas, penalidades, multas, tiempos de entrega, etc.).
@@ -88,6 +89,7 @@ Una decisión arquitectónica clave del proyecto fue separar la información cua
 * **Estructuración de Datos:** Pydantic
 * **Procesamiento Documental:** PyPDF2 / pdfplumber (según parser configurado)
 * **Generación de Entregables:** Pandas (`.xlsx`), python-docx (`.docx`)
+* **Base de Datos:** `oracledb` (Thick Mode) → Oracle 11g de planta
 * **Modelos de Lenguaje:** APIs de alta capacidad para razonamiento complejo de tablas de ingeniería (OpenAI GPT-5.4).
 
 ---
@@ -128,7 +130,13 @@ Para configurar el entorno y correr el proyecto en local, sigue estos pasos:
    source venv/bin/activate
    ```
 
-3. **Instalar las dependencias:**
+3. **Descargar Oracle Instant Client (Requerido para Thick Mode):**
+   El sistema se conecta a una base de datos Oracle 11g mediante `oracledb` en **Thick Mode**, lo cual requiere las librerías nativas de Oracle.
+   - Descargar el **Oracle Instant Client (Basic Package)** desde [oracle.com](https://www.oracle.com/database/technologies/instant-client/downloads.html) (versión compatible con Oracle 11g).
+   - Descomprimir en una ruta local (Ej: `C:\oracle\instantclient_21_x`).
+   - Agregar dicha ruta a la variable de entorno `PATH` del sistema, o configurar `oracledb.init_oracle_client(lib_dir=...)` en el código.
+
+4. **Instalar las dependencias:**
    ```bash
    pip install -r requirements.txt
    ```
@@ -140,10 +148,16 @@ Para configurar el entorno y correr el proyecto en local, sigue estos pasos:
 El sistema depende de múltiples proveedores de IA, debes proveer los tokens dentro de un archivo `.env` en la raíz del proyecto. Solo se requieren sus nombres (no incluyas valores reales en ramas públicas):
 
 ```env
+# --- APIs de Modelos de Lenguaje ---
 GOOGLE_API_KEY=tu_token_aqui
 TOGETHER_API_KEY=tu_token_aqui
 GROK_API_KEY=tu_token_aqui
 OPENAI_API_KEY=tu_token_aqui
+
+# --- Base de Datos Oracle (Magnetron Planta) ---
+DB_USER=tu_usuario_aqui
+DB_PASSWORD=tu_contraseña_aqui
+DB_DSN=IP:PUERTO/SERVICIO
 ```
 
 ---
@@ -167,7 +181,10 @@ agente_cotizaciones/
 │   │   └── state.py               # Definición de estados para LangGraph
 │   ├── tools/                 # Herramientas y utilidades complementarias
 │   │   ├── exportador.py          # Herramienta de generación de Excel/Word final
-│   │   └── extractor.py           # Scraping o preprocesamiento de PDF a texto
+│   │   ├── exportador_comercial.py# Exportador de entregables comerciales (Word/Excel)
+│   │   ├── exportador_sdm.py      # Exportador de archivos JSON SDM individuales
+│   │   ├── extractor.py           # Scraping o preprocesamiento de PDF a texto
+│   │   └── normalizador_sdm.py    # Conexión en vivo con Oracle DB y Regex
 │   ├── corelogic.py           # Lógica central del sistema
 │   └── grafo.py               # Definición y orquestación del LangGraph
 ├── test/                      # Entorno de pruebas
@@ -195,42 +212,35 @@ Una vez que el sistema finaliza, genera dos entregables clave:
 
 ## 📝 12. CHANGELOG
 
-* **2026-04-28 | `1dbb604`:** CUS2024-018 - Fix lógica de enrutamiento para SDM y documentos técnicos, resolución de bucle infinito en supervisor
-* **2026-04-27 | `2040e62`:** CUS2024-017 - WIP: Implementacion de enrutamiento modular con flags booleanos y flujo comercial independiente
-* **2026-04-26 | `51051a7`:** CUS2024-017 - Integración de Escuadrón Comercial con generación independiente de Word y Excel
-* **2026-04-25 | `a635694`:** CUS2024-016 - Generacion dinamica de JSON SDM individuales por cada transformador del inventario y se organizaron los prompts para que traiga la información en español
-* **2026-04-23 | `06fdf46`:** CUS2024-015 - Integración de Agente Auditor SDM, Intervención Humana (HITL) por terminal y generación de interfaz de datos JSON para software de diseño.
-* **2026-04-22 | `9d60b88`:** CUS2024-014 - Documentación exhaustiva del repositorio: Metadata YAML, docstrings detallados y estandarización de módulos core.
+* **2026-05-06 | `<hash>`:** CUS2024-021 - Estabilización de motor Regex en `normalizador_sdm.py` para ignorar separadores de miles y limpieza de inferencia geográfica (eliminación de dobles barras). Flujo de cruce con Oracle DB 100% exitoso y sin errores.
+* **2026-05-05 | `fde34d1`:** CUS2024-020 - Integración de Alineador Normativo y motor de mapeo relacional SDM, conectado con base de datos SQLDeveloper de Oracle mediante `oracledb` (Thick Mode), con actualización de caché automática.
+* **2026-04-30 | `87b34d9`:** CUS2024-019 - Integración de Alineador Normativo y motor de mapeo relacional SDM (CSV locales).
+* **2026-04-28 | `1dbb604`:** CUS2024-018 - Fix lógica de enrutamiento para SDM y documentos técnicos, resolución de bucle infinito en supervisor.
+* **2026-04-27 | `2040e62`:** CUS2024-017 - WIP: Implementación de enrutamiento modular con flags booleanos y flujo comercial independiente.
+* **2026-04-26 | `51051a7`:** CUS2024-017 - Integración de Escuadrón Comercial con generación independiente de Word y Excel.
+* **2026-04-25 | `a635694`:** CUS2024-016 - Generación dinámica de JSON SDM individuales. Prompts forzados en español.
+* **2026-04-23 | `06fdf46`:** CUS2024-015 - Integración de Agente Auditor SDM, Intervención Humana (HITL) y exportación JSON.
+* **2026-04-22 | `9d60b88`:** CUS2024-014 - Documentación exhaustiva: Metadata YAML, docstrings y estandarización.
 * **2026-04-21 | `f685dfd`:** CUS2024-013 - Definición de arquitectura MECE y manual de usuario inicial.
-* **2026-04-21 | `7c69f87`:** CUS2024-012 - Ajustes finales en validación de modelos Pydantic y lógica de variantes en el generador CTG.
-* **2026-04-20 | `b51809f`:** CUS2024-011 - Refactorización del Ensamblaje Final. Implementación de "Cerebro Independiente" para CTG y limpieza de caracteres basura OCR.
-* **2026-04-08 | `7c69f87`:** CUS2024-012 - Ajustes finales en modelos y generador CTG
-* **2026-04-07 | `b51809f`:** CUS2024-011 - Refactorización del Ensamblaje Final (Word y Excel CTG)
-  * Rediseño de `exportador.py`: Creación de un "Cerebro Independiente" para el CTG que utiliza el modelo de alta capacidad para lectura granular de tablas de pérdidas y fases.
-  * Implementación de Mapeo 1 a 1: El código ahora cruza la extracción del LLM con la verdad absoluta del Inventario, garantizando que el Excel final mantenga el número exacto de columnas, kVA y voltajes sin alucinaciones.
-  * Inyección de datos obligatorios: Se fuerza comercialmente a "MAGNETRON S.A.S." como fabricante en el entregable final.
-  * Actualización de `resumen_general`: Implementación de la función `limpiar_texto` basada en Regex para eliminar caracteres de control invisibles del OCR.
-  * Separación de responsabilidades confirmada: Escuadrones (Macro/Word) vs. Generador CTG (Micro/Excel).
-* **2026-04-07 | `86a3fef`:** CUS2024-010 - Integración Completa de la Fábrica de Especialistas
-* **2026-04-07 | `07cf253`:** CUS2024-009 - Implementación de Escuadrón Eléctrico con Revisor Iterativo y Fallback ANSI
-* **2026-04-01 | `20f3a10`:** CUS2024-008 - Implementacion de Fabrica de Modelos y enrutamiento dinamico de LLMs
-* **2026-03-31 | `bcca073`:** CUS2024-007 - Integracion de Agente CTG, extraccion EML y escudo anti-basura
-* **2026-03-31 | `8606570`:** CUS2024-006 - Integración de Agente CTG y exportación nativa a Word/Excel
-* **2026-03-30 | `767ce8f`:** CUS2024-005 - Eliminar carpetas de prueba subidas por error y actualizar gitignore
-* **2026-03-30 | `f6b83f4`:** CUS2024-004 - Implementar agente de resumen ejecutivo por familia o tipo de transformador
-* **2026-03-30 | `6439380`:** CUS2024-003 - Implementar Enrutador Multiagente con OpenAI y procesamiento Batch de contexto cruzado
-* **2026-03-30 | `fef99c2`:** CUS2024-002 - Eliminar carpetas de prueba subidas por error y actualizar gitignore
-* **2026-03-30 | `3ec1125`:** CUS2024-001 - Primera base funcional Fase 1 - Extraccion de Inventario
-* **2026-03-30 | `88b6459`:** Initialize from template: agente_cotizaciones
-* **2025-12-01 | `0aa1856`:** Sonar Generico
+* **2026-04-21 | `7c69f87`:** CUS2024-012 - Ajustes finales en validación de modelos Pydantic y lógica CTG.
+* **2026-04-20 | `b51809f`:** CUS2024-011 - Refactorización del Ensamblaje Final. Cerebro CTG y limpieza OCR.
+* **2026-04-07 | `86a3fef`:** CUS2024-010 - Integración Completa de la Fábrica de Especialistas.
+* **2026-04-07 | `07cf253`:** CUS2024-009 - Escuadrón Eléctrico con Revisor Iterativo y Fallback ANSI.
+* **2026-04-01 | `20f3a10`:** CUS2024-008 - Implementación de Fábrica de Modelos y enrutamiento dinámico.
+* **2026-03-31 | `bcca073`:** CUS2024-007 - Integración de Agente CTG, extracción EML y escudo anti-basura.
+* **2026-03-31 | `8606570`:** CUS2024-006 - Exportación nativa a Word/Excel.
+* **2026-03-30 | `767ce8f`:** CUS2024-005 - Limpieza de repositorio e ignore de temporales.
+* **2026-03-30 | `f6b83f4`:** CUS2024-004 - Implementar agente de resumen ejecutivo por familia.
+* **2026-03-30 | `6439380`:** CUS2024-003 - Implementar Enrutador Multiagente Batch.
+* **2026-03-30 | `3ec1125`:** CUS2024-001 - Primera base funcional Fase 1 - Extracción de Inventario.
 
 ---
 
 ## 📚 13. Documentación Extendida
 
-Se ha realizado un proceso exhaustivo de documentación en todo el repositorio (abril 2026), agregando metadata YAML y docstrings detallando el propósito y uso de cada módulo:
+Se ha realizado un proceso exhaustivo de documentación en todo el repositorio, agregando metadata YAML y docstrings detallando el propósito y uso de cada módulo:
 - `src/corelogic.py`: Gestión de selección e inicialización de LLMs.
 - `src/grafo.py`: Orquestador principal (Máquina Magnetrón).
-- `src/agents/`: Nodos especializados de extracción técnica, logística y comercial (Escuadrones y CTG).
-- `src/tools/`: Utilidades exportadoras (Excel/Word) y lectores PDF/Email con módulo de IA integrados.
+- `src/agents/`: Nodos especializados de extracción técnica, logística y comercial, incluyendo Auditores y Alineadores Normativos.
+- `src/tools/`: Utilidades exportadoras (Excel/Word/JSON), motores de conexión a bases de datos relacionales (`normalizador_sdm.py`) y lectores PDF/EML.
 - `src/schemas/`: Componentes Pydantic strict-mode garantes del tipado desde el estado de LangGraph hasta el Output Parser final.

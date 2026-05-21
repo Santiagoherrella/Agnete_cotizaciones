@@ -1,0 +1,8 @@
+#Configuracion de Sonar Generica para todos los proyectos desarrollo.
+include:
+  - project: "DesarrolloDT/Templates/Sonar_Template"
+    ref: "main"
+    file: "/sonar-generic.yml"
+
+sonarcloud:
+  extends: .sonarcloud_generic

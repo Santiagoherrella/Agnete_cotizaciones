@@ -33,8 +33,8 @@ def ejecutar_prueba_maestra():
     estado_inicial: BotState = {
         "configuracion": { # Datos que vamos a extraer
             "ejecutar_ingenieria": True,
-            "ejecutar_comercial": False,
-            "ejecutar_sdm": False
+            "ejecutar_comercial": True,
+            "ejecutar_sdm": True
         },
         "ruta_documento": "PROYECTO_PEA_RIVER_BATCH",
         "texto_extraido": texto_total,
