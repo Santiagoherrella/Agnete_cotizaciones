@@ -1,7 +1,6 @@
 # streamlit run streamlit_app.py
 import os
 
-
 import pandas as pd
 import streamlit as st
 
@@ -23,9 +22,10 @@ def _init_session_state() -> None:
         "workflow_result": None,
         "backend_state": None,
         "pending_fields": [],
+        "uploader_key": 0,
         "cfg_ingenieria": True,
         "cfg_comercial": True,
-        "cfg_sdm": True,
+        "cfg_sdm": False,
         "cfg_documentos_tecnicos": True,
         "cfg_ctg": True,
     }
@@ -37,6 +37,13 @@ def _init_session_state() -> None:
 def _enforce_sdm_dependency() -> None:
     if st.session_state.get("cfg_sdm"):
         st.session_state["cfg_ingenieria"] = True
+
+
+def _reset_quote_ui() -> None:
+    st.session_state["workflow_result"] = None
+    st.session_state["backend_state"] = None
+    st.session_state["pending_fields"] = []
+    st.session_state["uploader_key"] = int(st.session_state.get("uploader_key", 0)) + 1
 
 
 def _read_binary_file(file_path: str) -> bytes:
@@ -209,6 +216,10 @@ def main() -> None:
 
     with st.sidebar:
         st.header("Configuracion")
+        if st.button("Nueva cotizacion / Limpiar", type="secondary"):
+            _reset_quote_ui()
+            st.rerun()
+
         if st.session_state.get("cfg_sdm") and not st.session_state.get("cfg_ingenieria"):
             st.session_state["cfg_ingenieria"] = True
 
@@ -245,6 +256,7 @@ def main() -> None:
         "Documentos del proceso",
         type=["pdf", "docx", "doc", "xlsx", "xls", "txt", "eml"],
         accept_multiple_files=True,
+        key=f"uploader_{st.session_state.get('uploader_key', 0)}",
     )
 
     if uploaded_files:
@@ -259,6 +271,19 @@ def main() -> None:
         if not uploaded_files:
             st.error("Debes cargar al menos un archivo antes de ejecutar.")
         else:
+            empty_files = [f.name for f in uploaded_files if len(f.getbuffer()) == 0]
+            if empty_files:
+                st.error(
+                    "Hay archivos vacios o dañados: "
+                    + ", ".join(empty_files)
+                    + ". Vuelve a cargarlos o exportalos nuevamente."
+                )
+                return
+
+            st.session_state["workflow_result"] = None
+            st.session_state["backend_state"] = None
+            st.session_state["pending_fields"] = []
+
             request_config = {
                 "ejecutar_ingenieria": ejecutar_ingenieria,
                 "ejecutar_comercial": ejecutar_comercial,
@@ -268,7 +293,17 @@ def main() -> None:
             }
 
             with st.spinner("Procesando documentos y ejecutando orquestacion..."):
-                result = run_pipeline_from_uploads(uploaded_files, request_config)
+                try:
+                    result = run_pipeline_from_uploads(uploaded_files, request_config)
+                except ValueError as e:
+                    st.error(str(e))
+                    return
+                except Exception:
+                    st.error(
+                        "Ocurrio un error procesando los archivos. "
+                        "Revisa que el formato sea correcto y que el archivo no este protegido o corrupto."
+                    )
+                    return
 
             st.session_state.workflow_result = result
             st.session_state.backend_state = result["state"]

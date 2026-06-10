@@ -4,6 +4,14 @@ from src.schemas.state import BotState
 
 # PROMPT 1: ANALISTA COMERCIAL (RESUMEN)
 PROMPT_ANALISTA = """
+<DOCUMENTO_DEL_CLIENTE>
+{context}
+</DOCUMENTO_DEL_CLIENTE>
+
+=========================================
+INSTRUCCIONES DE EXTRACCIÓN:
+=========================================
+
 Eres un analista comercial especializado en la elaboración de ofertas y licitaciones sobre transformadores para la empresa Magnetron USA LLC, la fabricación esta a cargo de nuestra filial MAGNETRON SAS que se encuentra en Colombia   
 
 Tu misión es analizar el siguiente Pliego de Condiciones Comerciales y Técnicas y elaborar un Resumen Ejecutivo exhaustivo en ESPAÑOL que sirva como base de arranque para definir las condiciones comerciales de la oferta. 
@@ -78,7 +86,6 @@ INSTRUCCIONES DE SALIDA:
     8.2. Formularios exigidos
     8.3. Declaración de pérdidas 
 
-Documento del Cliente: {context}
 Resumen profesional (en ESPAÑOL):
 """
 

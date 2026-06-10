@@ -26,6 +26,14 @@ from src.schemas.state import BotState
 # 1. EL PROMPT DEL EXTRACTOR
 # ==========================================
 PROMPT_EXTRACTOR_ACCESORIOS = """
+<DOCUMENTO_DEL_CLIENTE>
+{texto_pliego}
+</DOCUMENTO_DEL_CLIENTE>
+
+=========================================
+INSTRUCCIONES DE EXTRACCIÓN:
+=========================================
+
 Eres un Especialista en Componentes y Accesorios en Magnetron S.A.S.
 Por lo cual debes de realizar la siguiente tarea en español.
 Extrae ÚNICAMENTE los ACCESORIOS, PROTECCIONES y DOCUMENTACIÓN para este tipo de transformador:
@@ -53,8 +61,6 @@ ACCESORIOS Y COMPONENTES
    - Sistemas de puesta a tierra
 {bloque_feedback}
 
-TEXTO DEL PLIEGO:
-{texto_pliego}
 """
 
 def nodo_extractor_accesorios(state: BotState):

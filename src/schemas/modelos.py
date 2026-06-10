@@ -126,6 +126,8 @@ class DatosLogisticos(BaseModel):
     condiciones_transporte: DatoValidado = Field(description="Condiciones de transporte y horarios de entrega")
     lugar_entrega_incoterm: DatoValidado = Field(description="Lugar de entrega (Zip code) e Incoterm")
     entregables_oferta: DatoValidado = Field(description="Planos, declaración de pérdidas o formatos solicitados con la oferta")
+    pais_entrega: DatoValidado = Field(description="Analice la dirección o Incoterm e infiera el país de instalación. Responda ÚNICAMENTE con el nombre del país (Ej: ESTADOS UNIDOS, COLOMBIA, MEXICO). Si no se menciona en absoluto, responda 'No especificado'."
+)
 
 # ==========================================
 # FASE 4: CTG INDEPENDIENTE (Restaurado)

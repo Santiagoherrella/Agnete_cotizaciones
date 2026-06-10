@@ -61,3 +61,19 @@ def router_sdm(state: BotState):
         return "saltar_a_documentos_tecnicos"
     
     return "terminar_familia"
+
+def router_post_sdm(state: BotState):
+    """Decide hacia dónde ir después de generar el JSON del SDM."""
+    config = state.get("configuracion", {})
+    if config.get("ejecutar_documentos_tecnicos", True):
+        return "ir_a_word"
+    elif config.get("ejecutar_ctg", True):
+        return "ir_a_ctg"
+    return "terminar_familia"
+
+def router_post_word(state: BotState):
+    """Decide hacia dónde ir después de ensamblar el Word."""
+    config = state.get("configuracion", {})
+    if config.get("ejecutar_ctg", True):
+        return "ir_a_ctg"
+    return "terminar_familia"

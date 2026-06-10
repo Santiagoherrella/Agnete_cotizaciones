@@ -1,5 +1,12 @@
 from src.schemas.state import BotState
 
+def _inyectar_respuesta(campo: str, valor_humano: str, datos_elec: dict, datos_mec: dict) -> None:
+    """Clasifica el campo y guarda la respuesta humana con trazabilidad."""
+    if "fluido" in campo or "aceite" in campo:
+        datos_mec[campo] = {"valor": valor_humano, "origen": "HITL (Intervencion Humana)"}
+    else:
+        datos_elec[campo] = {"valor": valor_humano, "origen": "HITL (Intervencion Humana)"}
+
 def nodo_human_in_the_loop(state: BotState):
     print("\n" + "🛑" * 30)
     print("👤 [HUMAN IN THE LOOP] INTERVENCIÓN REQUERIDA")
@@ -9,17 +16,23 @@ def nodo_human_in_the_loop(state: BotState):
     datos_elec = state.get("datos_electricos", {})
     datos_mec = state.get("datos_mecanicos", {})
     faltantes = state.get("campos_faltantes_sdm", [])
-    
-    # Recorremos lo que falta y pedimos input en la terminal
-    for campo in faltantes:
-        valor_humano = input(f"👉 Por favor, ingrese el valor técnico para '{campo}': ")
-        
-        # Inyectamos el dato donde corresponde con una etiqueta de auditoría
-        if "fluido" in campo or "aceite" in campo:
-            datos_mec[campo] = {"valor": valor_humano, "origen": "HITL (Intervención Humana)"}
-        else:
-            # Asumimos que BIL, impedancia, voltajes son eléctricos
-            datos_elec[campo] = {"valor": valor_humano, "origen": "HITL (Intervención Humana)"}
+    respuestas_humanas = state.get("respuestas_humanas", {})
+    modo_interaccion = state.get("modo_interaccion", "cli")
+
+    if respuestas_humanas:
+        for campo in faltantes:
+            valor_humano = str(respuestas_humanas.get(campo, "")).strip()
+            if not valor_humano:
+                raise ValueError(f"Falta la respuesta humana para el campo '{campo}'.")
+            _inyectar_respuesta(campo, valor_humano, datos_elec, datos_mec)
+    else:
+        if modo_interaccion == "web":
+            raise ValueError("Se requiere 'respuestas_humanas' para continuar la intervencion en modo web.")
+
+        # Recorremos lo que falta y pedimos input en la terminal
+        for campo in faltantes:
+            valor_humano = input(f"👉 Por favor, ingrese el valor técnico para '{campo}': ")
+            _inyectar_respuesta(campo, valor_humano, datos_elec, datos_mec)
             
     print("✅ [HUMAN IN THE LOOP] Datos actualizados. Reanudando proceso hacia el SDM...")
     print("🛑" * 30 + "\n")

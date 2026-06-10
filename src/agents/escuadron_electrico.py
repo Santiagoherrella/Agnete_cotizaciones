@@ -26,6 +26,14 @@ from src.schemas.state import BotState
 # 1. EL PROMPT DEL EXTRACTOR (Con Lupa de Feedback)
 # ==========================================
 PROMPT_EXTRACTOR_ELECTRICO = """
+<DOCUMENTO_DEL_CLIENTE>
+{texto_pliego}
+</DOCUMENTO_DEL_CLIENTE>
+
+=========================================
+INSTRUCCIONES DE EXTRACCIÓN:
+=========================================
+
 Eres un Ingeniero Electricista Senior especializado en el diseño de transformadores para Magnetron S.A.S.
 Por lo cual debes de realizar la siguiente tarea en español.
 Tu misión es extraer ÚNICAMENTE la información ELÉCTRICA correspondiente a este tipo de transformador:
@@ -61,8 +69,6 @@ NORMATIVA Y CERTIFICACIONES
    
 {bloque_feedback}
 
-TEXTO DEL PLIEGO:
-{texto_pliego}
 """
 
 # ==========================================

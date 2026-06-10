@@ -18,9 +18,9 @@ from src.agents.intervencion_humana import nodo_human_in_the_loop, decidir_ruta_
 from src.agents.agente_comercial import nodo_analista_comercial, nodo_tabulador_comercial
 from src.tools.exportador_comercial import nodo_word_comercial, nodo_excel_comercial
 
-from src.agents.configuraciones import validador_inicial, router_ingenieria, router_comercial, router_sdm
+from src.agents.configuraciones import validador_inicial, router_ingenieria, router_comercial, router_sdm, router_post_sdm, router_post_word
 from src.agents.supervisor import nodo_supervisor_familias
-
+from src.agents.alineador_normativo import nodo_alineador_normativo
 """
 ESTRUCTURA DEL GRAFO (WORKFLOW)
 ===============================
@@ -85,6 +85,7 @@ flujo.add_node("ensamblador_comercial_word", nodo_word_comercial)  # Genera el i
 flujo.add_node("exportador_comercial_excel", nodo_excel_comercial) # Genera el Excel comercial 
 
 # Generación de JSON para el Software SDM
+flujo.add_node("alineador_normativo", nodo_alineador_normativo)
 flujo.add_node("auditor_sdm", nodo_auditor_sdm) # Auditor de SDM
 flujo.add_node("generador_sdm", nodo_generar_json_sdm) # Generador de  JSON SDM
 
@@ -95,6 +96,8 @@ flujo.add_node("validador_inicial", validador_inicial) # Validador inicial
 flujo.add_node("router_ingenieria", router_ingenieria) # Router de ingeniería
 flujo.add_node("router_comercial", router_comercial) # Router comercial
 flujo.add_node("router_sdm", router_sdm) # Router SDM   
+flujo.add_node("router_post_sdm", router_post_sdm) #Router post SDM
+flujo.add_node("router_post_word", router_post_word) # Router post Word
 
 # --- DEFINICIÓN DE ARISTAS (EDGES) ---
 # Aquí se define el "camino" que sigue la información.
@@ -142,8 +145,9 @@ flujo.add_edge("extractor_logistico", "revisor_logistico")
 flujo.add_conditional_edges("revisor_logistico", router_comercial, {
     "reintentar": "extractor_logistico",
     "ir_a_comercial": "analista_comercial",
-    "saltar_a_sdm": "auditor_sdm",
+    "saltar_a_sdm": "alineador_normativo",
     "saltar_a_documentos_tecnicos": "ensamblador_word",
+    "saltar_a_ctg": "creador_ctg",
     "terminar_familia": "supervisor"
 })
 
@@ -155,13 +159,16 @@ flujo.add_edge("ensamblador_comercial_word", "exportador_comercial_excel")
 # Una vez generados los documentos comerciales, volvemos al flujo de ingeniería (SDM)
 # 4. Salida de Comercial -> SDM, Documentos Finales, o Supervisor
 flujo.add_conditional_edges("exportador_comercial_excel", router_sdm, {
-    "ir_a_sdm": "auditor_sdm",
+    "ir_a_sdm": "alineador_normativo",
     "saltar_a_documentos_tecnicos": "ensamblador_word", 
+    "saltar_a_ctg": "creador_ctg",
     "terminar_familia": "supervisor" 
 })
 
 
 # 2. El Auditor decide si va al SDM o pide ayuda
+flujo.add_edge("alineador_normativo", "auditor_sdm")
+
 flujo.add_conditional_edges("auditor_sdm", decidir_ruta_auditor, {
     "ir_a_sdm": "generador_sdm",
     "pedir_ayuda_humana": "intervencion_humana"
@@ -170,9 +177,22 @@ flujo.add_conditional_edges("auditor_sdm", decidir_ruta_auditor, {
 # 3. El humano reanuda hacia el SDM
 flujo.add_edge("intervencion_humana", "generador_sdm")
 
-# 4. Secuencia final estricta de documentos
-flujo.add_edge("generador_sdm", "ensamblador_word")
-flujo.add_edge("ensamblador_word", "creador_ctg")
+# 4. Secuencia final dinámica de documentos (Reemplaza la secuencia estricta)
+
+# Del SDM decidimos si vamos a Word, a CTG o terminamos la familia
+flujo.add_conditional_edges("generador_sdm", router_post_sdm, {
+    "ir_a_word": "ensamblador_word",
+    "ir_a_ctg": "creador_ctg",
+    "terminar_familia": "supervisor"
+})
+
+# Del Word decidimos si vamos a CTG o terminamos la familia
+flujo.add_conditional_edges("ensamblador_word", router_post_word, {
+    "ir_a_ctg": "creador_ctg",
+    "terminar_familia": "supervisor"
+})
+
+# El CTG siempre es el último paso técnico antes de volver al jefe
 flujo.add_edge("creador_ctg", "supervisor")
 
 

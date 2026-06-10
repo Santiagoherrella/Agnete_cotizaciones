@@ -21,6 +21,9 @@ class BotState(TypedDict):
     # ==========================================
     # FASE 1: ENTRADAS Y EXTRACCIÓN
     # ==========================================
+    run_id: str                     # Identificador de la corrida actual
+    modo_interaccion: str           # cli | web
+    archivos_entrada: List[str]     # Rutas locales de los archivos cargados
     ruta_documento: str             # El PDF, Excel o Word que subió el cliente
     texto_extraido: str             # El crudo (OCR / PyMuPDF)
     
@@ -65,6 +68,8 @@ class BotState(TypedDict):
     # --- E. Control SDM e Intervención Humana ---
     auditoria_sdm_ok: bool
     campos_faltantes_sdm: List[str]  # Lista de campos que el humano debe llenar
+    respuestas_humanas: Dict[str, str] # Respuestas manuales inyectadas desde UI o consola
+    datos_normalizados_sdm: dict
     # ==========================================
     # FASE 4: ESQUADRÓN COMERCIAL (Gaveta Comercial)
     # ==========================================
@@ -80,6 +85,7 @@ class BotState(TypedDict):
     fichas_tecnicas_finales: Annotated[List[Dict], operator.add]
     rutas_fichas_word: Annotated[List[str], operator.add]
     rutas_tablas_ctg: Annotated[List[str], operator.add] # Actualizado según tu test_martes.py
+    rutas_sdm_json: Annotated[List[str], operator.add]
     # ==========================================
     # FASE 6: MODULOS DE TRABAJO --> LLAMADO A FUNCIONES ESPECIFICAS
     # ==========================================    

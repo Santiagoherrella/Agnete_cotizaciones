@@ -24,6 +24,14 @@ from src.schemas.state import BotState
 # 1. EL PROMPT DEL EXTRACTOR (Basado en prompt comercial.txt)
 # ==========================================
 PROMPT_EXTRACTOR_LOGISTICO = """
+<DOCUMENTO_DEL_CLIENTE>
+{texto_pliego}
+</DOCUMENTO_DEL_CLIENTE>
+
+=========================================
+INSTRUCCIONES DE EXTRACCIÓN:
+=========================================
+
 Eres un Analista Comercial Senior elaborando licitaciones para Magnetron USA LLC (fabricación en MAGNETRON S.A.S. Colombia).
 Extrae ÚNICAMENTE la información COMERCIAL, LOGÍSTICA y JURÍDICA que aplica para este tipo de transformador:
 
@@ -73,8 +81,7 @@ ENTREGABLES DE LA OFERTA
    - Declaración de pérdidas
 {bloque_feedback}
 
-TEXTO DEL PLIEGO:
-{texto_pliego}
+
 """
 
 def nodo_extractor_logistico(state: BotState):

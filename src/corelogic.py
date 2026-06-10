@@ -21,6 +21,7 @@ import json
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
+from langchain_xai import ChatXAI
 
 # Cargar variables de entorno estáticas desde el .env al inicio del proceso
 load_dotenv()
@@ -82,6 +83,16 @@ def get_llm(id_agente: str):
             model=model_name, 
             temperature=temperature,
             google_api_key=os.getenv("GOOGLE_API_KEY")
+        )
+        
+    elif provider == "xai":
+        if 'GROK_API_KEY' not in os.environ:
+            raise ValueError("La variable XAI_API_KEY no está configurada en el .env")
+        
+        return ChatXAI(
+            model=model_name, 
+            temperature=temperature,
+            api_key=os.getenv("GROK_API_KEY")
         )
         
     else:

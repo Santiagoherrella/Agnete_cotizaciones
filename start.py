@@ -13,4 +13,5 @@
 # git checkout -b SHLl_desarrollo
 # git push -u origin SHLl_desarrollo
 # git add .
+# pip freeze > requirements.txt
 # git commit -m "CUS2024-019: Integración de Alineador Normativo y motor de mapeo relacional SDM"

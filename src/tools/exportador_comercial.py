@@ -10,7 +10,6 @@ def nodo_word_comercial(state: BotState):
     print("📝 [Exportador Comercial] Generando Resumen Ejecutivo en Word...")
     
     resumen_texto = state.get("resumen_comercial_ejecutivo", "No hay resumen disponible.")
-    tabla_markdown = state.get("tabla_comercial_checklist", "")
     cliente = state.get("cliente_identificado", "Cliente_Generico")
     
     # Crear Documento

@@ -26,6 +26,14 @@ from src.schemas.state import BotState
 # 1. EL PROMPT DEL EXTRACTOR
 # ==========================================
 PROMPT_EXTRACTOR_MECANICO = """
+<DOCUMENTO_DEL_CLIENTE>
+{texto_pliego}
+</DOCUMENTO_DEL_CLIENTE>
+
+=========================================
+INSTRUCCIONES DE EXTRACCIÓN:
+=========================================
+
 Eres un Ingeniero Mecánico Senior en Magnetron S.A.S.
 Extrae ÚNICAMENTE la información MECÁNICA,
 
@@ -63,8 +71,7 @@ SISTEMA DE PINTURA Y TRATAMIENTO SUPERFICIAL
    
 {bloque_feedback}
 
-TEXTO DEL PLIEGO:
-{texto_pliego}
+
 """
 
 # ==========================================
