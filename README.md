@@ -72,6 +72,7 @@ Una decisión arquitectónica clave del proyecto fue separar la información cua
 ### 💾 C. Archivo de Interfaz de Diseño (JSON SDM) - *Conexión con herramientas de Ingeniería*
 * **Objetivo:** Conexión con herramientas de Ingeniería y eliminación de la re-digitación manual.
 * **Generación:** Un archivo estructurado (`.json`) generado individualmente por cada transformador detectado en el inventario. Posee **conexión en vivo con Oracle 11g** (vía `oracledb` Thick Mode), mapeando el texto crudo del pliego a IDs relacionales oficiales del sistema de diseño (`IDKVA`, `IDVP`, `IDNORMA`).
+* **Granularidad y Precisión (Fases 1 y 2):** El exportador es capaz de desglosar variables (como impedancia, pérdidas y BIL) de forma exclusiva para cada kVA, eliminando la clonación de datos entre transformadores de la misma familia. Además extrae valores puramente matemáticos (como la cantidad total de taps o factores $K_1$ y $K_2$) listos para el consumo de ingeniería.
 * **Resultado:** Contiene los parámetros de diseño limpios, normalizados y cruzados contra la base de datos relacional de planta, listos para ser importados automáticamente por el Software de Diseño Magnetron (SDM).
 
 ### 💼 D. Checklist y Resumen Comercial - *Evaluación de Licitación*
@@ -82,19 +83,29 @@ Una decisión arquitectónica clave del proyecto fue separar la información cua
   - **Checklist Comercial (Excel):** Tabla estructurada con las condiciones de evaluación económica y legal, lista para la toma de decisiones comerciales.
 ---
 
-## 🛠️ 6. Stack Tecnológico
+## 📡 6. Trazabilidad y Logs
+
+El proyecto cuenta con un sistema de **Logging Centralizado** (`src/utils/logger.py`) diseñado para mantener el disco limpio y facilitar la depuración:
+* **Consola en vivo:** Todos los eventos (`[INFO]`, `[ERROR]`) se imprimen en la terminal para monitorear el progreso de los agentes en tiempo real.
+* **Archivo Físico:** Solo los eventos críticos y de nivel `[ERROR]` se persisten en `logs/agente_cotizaciones.log`. 
+* **Trazabilidad de Usuario:** Se inyecta dinámicamente el nombre de la sesión del usuario web utilizando variables de contexto (`contextvars`), permitiendo saber quién inició cada corrida.
+* **Rotación:** El archivo físico se rota automáticamente al alcanzar los 5 MB, manteniendo un máximo de 3 respaldos históricos para evitar saturar el servidor.
+
+---
+
+## 🛠️ 7. Stack Tecnológico
 
 * **Lenguaje:** Python 3.10+
 * **Orquestación:** LangGraph / LangChain
 * **Estructuración de Datos:** Pydantic
-* **Procesamiento Documental:** PyPDF2 / pdfplumber (según parser configurado)
+* **Procesamiento Documental:** PyMuPDF (fitz) / pdfplumber / LangChain Vision
 * **Generación de Entregables:** Pandas (`.xlsx`), python-docx (`.docx`)
 * **Base de Datos:** `oracledb` (Thick Mode) → Oracle 11g de planta
 * **Modelos de Lenguaje:** APIs de alta capacidad para razonamiento complejo de tablas de ingeniería (OpenAI GPT-5.4).
 
 ---
 
-## 🚀 7. Instrucciones de Ejecución
+## 🚀 8. Instrucciones de Ejecución
 
 Para iniciar el ciclo completo de procesamiento:
 
@@ -109,7 +120,7 @@ python test_martes.py
 
 ---
 
-## 🛠️ 8. Instalación
+## 🛠️ 9. Instalación
 
 Para configurar el entorno y correr el proyecto en local, sigue estos pasos:
 
@@ -143,7 +154,7 @@ Para configurar el entorno y correr el proyecto en local, sigue estos pasos:
 
 ---
 
-## 🔐 9. Variables de Entorno
+## 🔐 10. Variables de Entorno
 
 El sistema depende de múltiples proveedores de IA, debes proveer los tokens dentro de un archivo `.env` en la raíz del proyecto. Solo se requieren sus nombres (no incluyas valores reales en ramas públicas):
 
@@ -162,10 +173,11 @@ DB_DSN=IP:PUERTO/SERVICIO
 
 ---
 
-## 📂 10. Árbol de Estructura del Proyecto
+## 📂 11. Árbol de Estructura del Proyecto
 
 ```text
 agente_cotizaciones/
+├── logs/                      # Archivos de registro y depuración rotativos
 ├── data/                      # Archivos temporales o de entrada y salida
 ├── src/                       # Código fuente principal
 │   ├── agents/                # Agentes IA especializados
@@ -185,6 +197,8 @@ agente_cotizaciones/
 │   │   ├── exportador_sdm.py      # Exportador de archivos JSON SDM individuales
 │   │   ├── extractor.py           # Scraping o preprocesamiento de PDF a texto
 │   │   └── normalizador_sdm.py    # Conexión en vivo con Oracle DB y Regex
+│   ├── utils/                 # Utilidades generales
+│   │   └── logger.py              # Sistema centralizado de logs y rotación
 │   ├── corelogic.py           # Lógica central del sistema
 │   └── grafo.py               # Definición y orquestación del LangGraph
 ├── test/                      # Entorno de pruebas
@@ -196,7 +210,7 @@ agente_cotizaciones/
 
 ---
 
-## 📤 11. Ejemplo de Salida (Resultados Generados)
+## 📤 12. Ejemplo de Salida (Resultados Generados)
 
 Una vez que el sistema finaliza, genera dos entregables clave:
 
@@ -210,8 +224,12 @@ Una vez que el sistema finaliza, genera dos entregables clave:
 
 ---
 
-## 📝 12. CHANGELOG
+## 📝 13. CHANGELOG
 
+* **2026-06-24 | `latest`:** CUS2026-025 - Fase 4: Extracción Híbrida y Reglas Normativas. Reemplazo de Pymupdf4llm/Camelot por arquitectura fitz+pdfplumber+visión para máxima velocidad. Truncamiento de seguridad (300k chars) para prevenir sobrecarga de LLMs. Integración de auditoría inteligente de certificaciones (UL, FM, NTC) con alertas en rojo para Word y exportación SDM.
+* **2026-06-22 | `latest`:** CUS2026-024 - Fase 3: Optimización Core y UX. Se eliminó la lógica de reintentos infinitos en los 4 escuadrones para acelerar drásticamente el procesamiento y reducir consumo de API. Se implementó un sistema de logs centralizado (`logger.py`) que registra dinámicamente al usuario web y guarda de forma permanente únicamente eventos de nivel ERROR. Mejoras en la interfaz web (Streamlit): se añadieron paneles colapsables (expanders) para ocultar JSONs y reportes técnicos largos, y se integró un botón flotante de Microsoft Forms para feedback del usuario.
+* **2026-06-18 | `latest`:** CUS2026-023 - Fase 2: Implementación de precisión numérica para Taps y factores de evaluación de pérdidas ($K_1$, $K_2$) en `exportador_sdm.py`.
+* **2026-06-18 | `latest`:** CUS2026-022 - Fase 1: Refactorización de granularidad por kVA en `modelos.py` y `exportador_sdm.py`. Se elimina la clonación de parámetros técnicos entre transformadores de la misma familia.
 * **2026-05-06 | `<hash>`:** CUS2024-021 - Estabilización de motor Regex en `normalizador_sdm.py` para ignorar separadores de miles y limpieza de inferencia geográfica (eliminación de dobles barras). Flujo de cruce con Oracle DB 100% exitoso y sin errores.
 * **2026-05-05 | `fde34d1`:** CUS2024-020 - Integración de Alineador Normativo y motor de mapeo relacional SDM, conectado con base de datos SQLDeveloper de Oracle mediante `oracledb` (Thick Mode), con actualización de caché automática.
 * **2026-04-30 | `87b34d9`:** CUS2024-019 - Integración de Alineador Normativo y motor de mapeo relacional SDM (CSV locales).
@@ -236,7 +254,7 @@ Una vez que el sistema finaliza, genera dos entregables clave:
 
 ---
 
-## 📚 13. Documentación Extendida
+## 📚 14. Documentación Extendida
 
 Se ha realizado un proceso exhaustivo de documentación en todo el repositorio, agregando metadata YAML y docstrings detallando el propósito y uso de cada módulo:
 - `src/corelogic.py`: Gestión de selección e inicialización de LLMs.

@@ -48,6 +48,17 @@ class DatoValidado(BaseModel):
 # FASE 3: LOS 4 ESCUADRONES (Ultra-Granulares)
 # ==========================================
 
+class ParametrosPorKVA(BaseModel):
+    potencia_kva: str = Field(description="Potencia específica en kVA a la que aplican estos valores (Ej: 75, 300).")
+    impedancia_cortocircuito: DatoValidado = Field(description="Impedancia de cortocircuito específica para este kVA (%)")
+    perdidas_carga: DatoValidado = Field(description="Pérdidas con carga específicas para este kVA (W)")
+    perdidas_no_carga: DatoValidado = Field(description="Pérdidas sin carga (vacío) específicas para este kVA (W)")
+    bil_primario: DatoValidado = Field(description="BIL primario específico si varía por kVA")
+    alto_especifico: Optional[DatoValidado] = Field(default=None, description="Alto específico (opcional)")
+    ancho_especifico: Optional[DatoValidado] = Field(default=None, description="Ancho específico (opcional)")
+    largo_especifico: Optional[DatoValidado] = Field(default=None, description="Largo específico (opcional)")
+    dimensiones_peso_limites: Optional[DatoValidado] = Field(default=None, description="Peso específico (opcional)")
+
 class DatosElectricos(BaseModel):
     # SECCIÓN 1: GENERALES
     tipo_transformador: DatoValidado = Field(description="Tipo de transformador(es) requerido(s)")
@@ -67,11 +78,23 @@ class DatosElectricos(BaseModel):
     grupo_conexion_desfase: DatoValidado = Field(description="Grupo de conexión e información de desfase (Ej: 30°)")
     impedancia_cortocircuito: DatoValidado = Field(description="Impedancia de cortocircuito (%)")
     regulacion_taps: DatoValidado = Field(description="Regulación de tensión (taps)")
+    cantidad_taps: Optional[int] = Field(default=None, description="Número total de derivaciones o taps extraído del texto (ej. si son 2 arriba y 2 abajo, extraer el número 4)")
+    paso_porcentaje_taps: Optional[float] = Field(default=None, description="Porcentaje numérico de cada paso del tap extraído del texto (ej. 2.5)")
+    
     nivel_perdidas_maximas: DatoValidado = Field(description="Nivel de pérdidas máximas permitidas. (Aclarar si es doble voltaje)")
+    
+    # FACTORES ECONÓMICOS
+    evaluacion_perdidas: Optional[DatoValidado] = Field(default=None, description="Fórmula o texto de evaluación económica de pérdidas")
+    k1_usd_w: Optional[float] = Field(default=None, description="Factor K1 (penalización por pérdidas en vacío) extraído del texto en dólares por watt (ej. 4.58)")
+    k2_usd_w: Optional[float] = Field(default=None, description="Factor K2 (penalización por pérdidas con carga) extraído del texto en dólares por watt (ej. 3.75)")
+    
     perdidas_carga: DatoValidado = Field(description="Nivel de pérdidas con carga")
     perdidas_no_carga: DatoValidado = Field(description="Nivel de pérdidas sin carga")
     perdidas_totales: DatoValidado = Field(description="Nivel de pérdidas totales")
     eficiencia: DatoValidado = Field(description="Nivel de eficiencia")
+    evaluacion_perdidas: DatoValidado = Field(description="Fórmulas de evaluación o capitalización de pérdidas. Busca rigurosamente factores monetarios (A, B, K1, K2, K3, K4) típicamente en $/W o $/kW. Extrae el texto literal de la fórmula si está presente.")
+    variantes_por_potencia: List[ParametrosPorKVA] = Field(default=[], description="Lista de especificaciones técnicas desglosadas OBLIGATORIAMENTE por CADA potencia (kVA) requerida. Si hay varios transformadores con distintos kVA, debes llenar un bloque por cada uno.")
+
 
 class DatosMecanicos(BaseModel):
     # SECCIÓN 3: CONSTRUCTIVAS
@@ -120,7 +143,7 @@ class DatosLogisticos(BaseModel):
     normas_aplicables: DatoValidado = Field(description="Estándares aplicables con número y título completo (IEEE/ANSI)")
     pruebas_ensayos: DatoValidado = Field(description="Pruebas, ensayos requeridos y certificaciones exigidas")
     penalizaciones_multas: DatoValidado = Field(description="Penalizaciones, multas o anexos jurídicos")
-    certificacion_ul: DatoValidado = Field(description="Indica si se requiere sello o certificación UL. Extrae el texto exacto o pon 'No especificado'.")
+    certificaciones_solicitadas: DatoValidado = Field(description="Lista exhaustiva de TODAS las certificaciones exigidas en el pliego (Ej: UL, FM, NTC, ENEL, DOE 2016 AMORFOS, etc.). Si no se mencionan certificaciones, pon 'No especificado'.")
     # SECCIÓN 8 Y 9: EMBALAJE Y ENTREGABLES
     tipo_embalaje_preservacion: DatoValidado = Field(description="Tipo de embalaje, materiales, y requisitos de preservación")
     condiciones_transporte: DatoValidado = Field(description="Condiciones de transporte y horarios de entrega")

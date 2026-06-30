@@ -1,6 +1,9 @@
 from langchain_core.prompts import ChatPromptTemplate
 from src.corelogic import get_llm
 from src.schemas.state import BotState
+from src.utils.logger import get_logger
+
+logger = get_logger("AgenteComercial")
 
 # PROMPT 1: ANALISTA COMERCIAL (RESUMEN)
 PROMPT_ANALISTA = """
@@ -142,7 +145,7 @@ RESUMEN EJECUTIVO:
 """
 
 def nodo_analista_comercial(state: BotState):
-    print("💼 [Agente Comercial] Redactando Resumen Ejecutivo...")
+    logger.info("Redactando Resumen Ejecutivo...")
     llm = get_llm("agente_resumen") 
     prompt = ChatPromptTemplate.from_template(PROMPT_ANALISTA)
     cadena = prompt | llm
@@ -151,7 +154,7 @@ def nodo_analista_comercial(state: BotState):
     return {"resumen_comercial_ejecutivo": respuesta.content}
 
 def nodo_tabulador_comercial(state: BotState):
-    print("📊 [Agente Comercial] Generando Tabla de Checklist...")
+    logger.info("Generando Tabla de Checklist...")
     llm = get_llm("agente_inventario") 
     prompt = ChatPromptTemplate.from_template(PROMPT_TABLA)
     cadena = prompt | llm

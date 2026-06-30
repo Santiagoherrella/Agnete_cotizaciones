@@ -21,6 +21,9 @@ from langchain_core.prompts import ChatPromptTemplate
 from src.corelogic import get_llm
 from src.schemas.modelos import DatosElectricos
 from src.schemas.state import BotState
+from src.utils.logger import get_logger
+logger = get_logger("EscuadronElectrico")
+
 
 # ==========================================
 # 1. EL PROMPT DEL EXTRACTOR (Con Lupa de Feedback)
@@ -39,6 +42,13 @@ Por lo cual debes de realizar la siguiente tarea en español.
 Tu misión es extraer ÚNICAMENTE la información ELÉCTRICA correspondiente a este tipo de transformador:
 
 TIPO: {tipo_transformador}
+POTENCIAS SOLICITADAS (kVA): {potencias_requeridas}
+
+🚨 REGLA DE AISLAMIENTO ESTRICTO 🚨
+El documento adjunto contiene información para MÚLTIPLES tipos de transformadores y familias. 
+TÚ SOLO DEBES EXTRAER LA INFORMACIÓN PARA LA FAMILIA: {tipo_transformador}.
+IGNORA POR COMPLETO cualquier párrafo, tabla o especificación que pertenezca explícitamente a otras familias presentes en el documento, tales como: {otras_familias}.
+Si una especificación (ej. voltaje, taps) menciona que es para otra familia, NO LA EXTRAIGAS, táchala mentalmente.
 
 INSTRUCCIONES CRÍTICAS:
 - IDIOMA OBLIGATORIO: Todo el texto extraído y generado DEBE estar 100% en ESPAÑOL TÉCNICO. 
@@ -55,9 +65,12 @@ PARÁMETROS ELÉCTRICOS
    - Frecuencia de operación
    - Grupo de conexión
    - Impedancia de cortocircuito (%)
-   - Regulación de tensión (taps)
-   - Nivel de pérdidas máximas permitidas. (si es doble voltaje cual de los voltages debe de cumplir estas)
+   - Regulación de tensión (taps). DEBES extraer matemáticamente la `cantidad_taps` (el total, ej: 4) y el `paso_porcentaje_taps` (ej: 2.5).
+   - Nivel de pérdidas máximas permitidas y/o Fórmulas de Evaluación Económica de Pérdidas. Si hay factores de evaluación en dólares por watt, DEBES extraer matemáticamente `k1_usd_w` y `k2_usd_w`.
    - BIL (Nivel Básico de Aislamiento)
+
+> IMPORTANTE: Hay múltiples potencias solicitadas. Para la impedancia, pérdidas y BIL, busca en las tablas del pliego y LLENA OBLIGATORIAMENTE la sección de variantes (`variantes_por_potencia`) desglosando los valores específicos para cada kVA solicitado en la lista de potencias.
+
 NORMATIVA Y CERTIFICACIONES
 (Listar SOLO las normas mencionadas explícitamente):
    - Estándares aplicables con número y título completo
@@ -86,7 +99,7 @@ def nodo_extractor_electrico(state: BotState):
     Retorna:
     - Diccionario con la clave "datos_electricos" mapeada al resultado (diccionario).
     """
-    print(f"⚡ [Extractor Eléctrico] Analizando {state['item_actual_id']} (Intento {state.get('intentos_electrico', 0) + 1})")
+    logger.info(f" [Extractor Eléctrico] Analizando {state['item_actual_id']} (Intento {state.get('intentos_electrico', 0) + 1})")
     
     texto_crudo = state.get("texto_extraido", "")
     inventario = state.get("inventario_global", [])
@@ -96,9 +109,19 @@ def nodo_extractor_electrico(state: BotState):
     if not trafo_actual: 
         return {"datos_electricos": {}}
 
+    # Extraer todas las potencias únicas para esta familia en el inventario
+    familia_str = trafo_actual.get("tipo_transformador", "")
+    potencias_familia = list(set([t.get("potencia", "") for t in inventario if t.get("tipo_transformador") == familia_str and t.get("potencia")]))
+    potencias_str = ", ".join(potencias_familia) if potencias_familia else trafo_actual.get("potencia", "")
+
+    # Identificar otras familias para la Regla de Aislamiento
+    todas_familias = list(set([t.get("tipo_transformador", "") for t in inventario if t.get("tipo_transformador") and t.get("tipo_transformador") != "No especificado"]))
+    otras_familias = [f for f in todas_familias if f != familia_str]
+    otras_familias_str = ", ".join(otras_familias) if otras_familias else "Ninguna otra familia identificada"
+
     # Si el revisor dejó feedback en un intento anterior, lo inyectamos como "lupa"
     feedback = state.get("feedback_electrico", "")
-    bloque_feedback = f"\n⚠️ ATENCIÓN - INSTRUCCIÓN DEL REVISOR:\n{feedback}\n" if feedback and "APROBADO" not in feedback else ""
+    bloque_feedback = f"\n ATENCIÓN - INSTRUCCIÓN DEL REVISOR:\n{feedback}\n" if feedback and "APROBADO" not in feedback else ""
 
     llm = get_llm("agente_electrico") # Usa el modelo configurado en config.json
     llm_estructurado = llm.with_structured_output(DatosElectricos)
@@ -108,11 +131,11 @@ def nodo_extractor_electrico(state: BotState):
     resultado = cadena.invoke({
         "item_id": trafo_actual["item_id"],
         "potencia": trafo_actual["potencia"],
-        "voltaje_primario": trafo_actual["voltaje_primario"],
-        "voltaje_secundario": trafo_actual["voltaje_secundario"],
+        "potencias_requeridas": potencias_str,
         "tipo_transformador": trafo_actual["tipo_transformador"],
-        "bloque_feedback": bloque_feedback,
-        "texto_pliego": texto_crudo
+        "otras_familias": otras_familias_str,
+        "texto_pliego": texto_crudo,
+        "bloque_feedback": bloque_feedback
     })
     
     # Convertimos el objeto Pydantic a diccionario para guardarlo en el State
@@ -135,7 +158,7 @@ def nodo_revisor_electrico(state: BotState):
     datos = state.get("datos_electricos", {})
     intentos = state.get("intentos_electrico", 0)
     
-    print(f"🕵️‍♂️ [Revisor Eléctrico] Auditando datos...")
+    logger.info(f" [Revisor Eléctrico] Auditando datos...")
     
     faltan_datos = []
     if datos.get("impedancia", {}).get("valor") == "No especificado":
@@ -144,21 +167,16 @@ def nodo_revisor_electrico(state: BotState):
         faltan_datos.append("bil_primario")
 
     if not faltan_datos:
-        print("✅ [Revisor Eléctrico] Datos completos. Aprobado.")
+        logger.info(" [Revisor Eléctrico] Datos completos. Aprobado.")
         return {"feedback_electrico": "APROBADO"}
     
-    if intentos < 1:
-        msg = f"No encontré: {', '.join(faltan_datos)}. Por favor, busca con más cuidado en las secciones de 'Ratings' o 'Impedance'."
-        print(f"❌ [Revisor Eléctrico] Faltan datos. Solicitando reintento... ({msg})")
-        return {"intentos_electrico": intentos + 1, "feedback_electrico": msg}
-    
     # ESCENARIO C: Fallback (Alertas de Diseño generadas sin LLM)
-    print(f"⚠️ [Revisor Eléctrico] Intentos agotados. Generando alerta para: {', '.join(faltan_datos)}")
+    logger.info(f" [Revisor Eléctrico] Datos faltantes. Generando alerta para: {', '.join(faltan_datos)}")
     nuevas_alertas = []
     if "impedancia" in faltan_datos:
-        nuevas_alertas.append("⚡ Eléctrico: Impedancia no especificada. Sugerencia: Usar estándar ANSI C57.12.34 (Ej: 1.5% a 2.5%).")
+        nuevas_alertas.append(" Eléctrico: Impedancia no especificada. Sugerencia: Usar estándar ANSI C57.12.34 (Ej: 1.5% a 2.5%).")
     if "bil_primario" in faltan_datos:
-        nuevas_alertas.append("⚡ Eléctrico: BIL Primario no especificado. Sugerencia: Validar estándar Magnetrón según voltaje.")
+        nuevas_alertas.append(" Eléctrico: BIL Primario no especificado. Sugerencia: Validar estándar Magnetrón según voltaje.")
         
     return {
         "datos_electricos": datos, # El dato se queda como "No especificado"

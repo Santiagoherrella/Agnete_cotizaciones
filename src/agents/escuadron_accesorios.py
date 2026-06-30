@@ -21,6 +21,9 @@ from langchain_core.prompts import ChatPromptTemplate
 from src.corelogic import get_llm
 from src.schemas.modelos import DatosAccesorios
 from src.schemas.state import BotState
+from src.utils.logger import get_logger
+logger = get_logger("EscuadronAccesorios")
+
 
 # ==========================================
 # 1. EL PROMPT DEL EXTRACTOR
@@ -39,6 +42,12 @@ Por lo cual debes de realizar la siguiente tarea en español.
 Extrae ÚNICAMENTE los ACCESORIOS, PROTECCIONES y DOCUMENTACIÓN para este tipo de transformador:
 
 TIPO: {tipo_transformador}
+
+🚨 REGLA DE AISLAMIENTO ESTRICTO 🚨
+El documento adjunto contiene información para MÚLTIPLES tipos de transformadores y familias. 
+TÚ SOLO DEBES EXTRAER LA INFORMACIÓN PARA LA FAMILIA: {tipo_transformador}.
+IGNORA POR COMPLETO cualquier párrafo, tabla o especificación que pertenezca explícitamente a otras familias presentes en el documento, tales como: {otras_familias}.
+Si una especificación menciona que es para otra familia, NO LA EXTRAIGAS, táchala mentalmente.
 
 INSTRUCCIONES CRÍTICAS:
 - IDIOMA OBLIGATORIO: Todo el texto extraído y generado DEBE estar 100% en ESPAÑOL TÉCNICO. 
@@ -74,29 +83,36 @@ def nodo_extractor_accesorios(state: BotState):
     Retorna:
     - Diccionario con la clave "datos_accesorios" mapeada al resultado extraído.
     """
-    print(f"🧰 [Extractor Accesorios] Analizando {state.get('item_actual_id', '')} (Intento {state.get('intentos_accesorios', 0) + 1})")
+    logger.info(f" [Extractor Accesorios] Analizando {state.get('item_actual_id', '')} (Intento {state.get('intentos_accesorios', 0) + 1})")
     
     # 1. Preparar información basica del ítem desde el estado
     texto_crudo = state.get("texto_extraido", "")
-    trafo_actual = next((t for t in state.get("inventario_global", []) if t["item_id"] == state.get("item_actual_id", "")), None)
+    inventario = state.get("inventario_global", [])
+    trafo_actual = next((t for t in inventario if t["item_id"] == state.get("item_actual_id", "")), None)
     
     if not trafo_actual: 
         return {"datos_accesorios": {}}
 
+    # Identificar otras familias para la Regla de Aislamiento
+    familia_str = trafo_actual.get("tipo_transformador", "")
+    todas_familias = list(set([t.get("tipo_transformador", "") for t in inventario if t.get("tipo_transformador") and t.get("tipo_transformador") != "No especificado"]))
+    otras_familias = [f for f in todas_familias if f != familia_str]
+    otras_familias_str = ", ".join(otras_familias) if otras_familias else "Ninguna otra familia identificada"
+
     # 2. Inyección de feedback (Ciclo iterado del Revisor)
     feedback = state.get("feedback_accesorios", "")
-    bloque_feedback = f"\n⚠️ ATENCIÓN - INSTRUCCIÓN DEL REVISOR:\n{feedback}\n" if feedback and "APROBADO" not in feedback else ""
+    bloque_feedback = f"\n ATENCIÓN - INSTRUCCIÓN DEL REVISOR:\n{feedback}\n" if feedback and "APROBADO" not in feedback else ""
 
     # 3. Solicitud al LLM pidiendo que empareje la salida con "DatosAccesorios"
     llm_estructurado = get_llm("agente_accesorios").with_structured_output(DatosAccesorios)
     prompt = ChatPromptTemplate.from_template(PROMPT_EXTRACTOR_ACCESORIOS)
     
-    resultado = (prompt | llm_estructurado).invoke({
-        "item_id": trafo_actual["item_id"],
-        "potencia": trafo_actual["potencia"],
+    cadena = prompt | llm_estructurado
+    resultado = cadena.invoke({
         "tipo_transformador": trafo_actual["tipo_transformador"],
-        "bloque_feedback": bloque_feedback,
-        "texto_pliego": texto_crudo
+        "otras_familias": otras_familias_str,
+        "texto_pliego": texto_crudo,
+        "bloque_feedback": bloque_feedback
     })
     
     # Manejar compatibilidad entre versiones de Pydantic
@@ -115,7 +131,7 @@ def nodo_revisor_accesorios(state: BotState):
     """
     datos = state.get("datos_accesorios", {})
     intentos = state.get("intentos_accesorios", 0)
-    print(f"🕵️‍♂️ [Revisor Accesorios] Auditando datos...")
+    logger.info(f" [Revisor Accesorios] Auditando datos...")
     
     # 1. Auditoría de información mínima
     faltan_datos = []
@@ -126,22 +142,16 @@ def nodo_revisor_accesorios(state: BotState):
 
     # 2. Flujo Exitoso
     if not faltan_datos:
-        print("✅ [Revisor Accesorios] Datos completos. Aprobado.")
+        logger.info(" [Revisor Accesorios] Datos completos. Aprobado.")
         return {"feedback_accesorios": "APROBADO"}
     
-    # 3. Flujo Reprocesamiento (Aún hay intentos)
-    if intentos < 1:
-        msg = f"No encontré: {', '.join(faltan_datos)}. Busca en las secciones de 'Bushings', 'Terminals', o 'Protection'."
-        print(f"❌ [Revisor Accesorios] Faltan datos. Solicitando reintento... ({msg})")
-        return {"intentos_accesorios": intentos + 1, "feedback_accesorios": msg}
-    
-    # 4. Flujo de Alerta/Fallback (Intentos agotados)
-    print(f"⚠️ [Revisor Accesorios] Intentos agotados. Generando alerta para: {', '.join(faltan_datos)}")
+    # 3. Flujo de Alerta/Fallback (Sin reintentos)
+    logger.info(f" [Revisor Accesorios] Datos faltantes. Generando alerta para: {', '.join(faltan_datos)}")
     nuevas_alertas = []
     if "aisladores_at" in faltan_datos:
-        nuevas_alertas.append("🧰 Accesorios: Aisladores AT no especificados. Sugerencia: Para Padmount usar Insertos 200A. Para Polemount usar Bushings de Porcelana.")
+        nuevas_alertas.append(" Accesorios: Aisladores AT no especificados. Sugerencia: Para Padmount usar Insertos 200A. Para Polemount usar Bushings de Porcelana.")
     if "fusibles" in faltan_datos:
-        nuevas_alertas.append("🧰 Accesorios: Protección no especificada. Sugerencia: Para Padmount incluir fusibles Bayonet.")
+        nuevas_alertas.append(" Accesorios: Protección no especificada. Sugerencia: Para Padmount incluir fusibles Bayonet.")
         
     return {
         "datos_accesorios": datos, 

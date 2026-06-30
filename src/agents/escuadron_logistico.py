@@ -19,6 +19,9 @@ from langchain_core.prompts import ChatPromptTemplate
 from src.corelogic import get_llm
 from src.schemas.modelos import DatosLogisticos
 from src.schemas.state import BotState
+from src.utils.logger import get_logger
+logger = get_logger("EscuadronLogistico")
+
 
 # ==========================================
 # 1. EL PROMPT DEL EXTRACTOR (Basado en prompt comercial.txt)
@@ -36,6 +39,12 @@ Eres un Analista Comercial Senior elaborando licitaciones para Magnetron USA LLC
 Extrae ÚNICAMENTE la información COMERCIAL, LOGÍSTICA y JURÍDICA que aplica para este tipo de transformador:
 
 EQUIPO: {tipo_transformador}
+
+🚨 REGLA DE AISLAMIENTO ESTRICTO 🚨
+El documento adjunto contiene información para MÚLTIPLES tipos de transformadores y familias. 
+TÚ SOLO DEBES EXTRAER LA INFORMACIÓN PARA LA FAMILIA: {tipo_transformador}.
+IGNORA POR COMPLETO cualquier párrafo, tabla o especificación que pertenezca explícitamente a otras familias presentes en el documento, tales como: {otras_familias}.
+Si una especificación (ej. lugar de entrega, embalaje) menciona que es para otra familia, NO LA EXTRAIGAS, táchala mentalmente.
 
 INSTRUCCIONES CRÍTICAS:
 - IDIOMA OBLIGATORIO: Todo el texto extraído y generado DEBE estar 100% en ESPAÑOL TÉCNICO. 
@@ -94,25 +103,34 @@ def nodo_extractor_logistico(state: BotState):
     Retorna:
     - `{"datos_logisticos": {...}}` con el mapa de la data según la interfaz `DatosLogisticos`.
     """
-    print(f"🚚 [Extractor Logístico] Analizando reglas comerciales para: {state.get('item_actual_id', '')} (Intento {state.get('intentos_logistico', 0) + 1})")
+    logger.info(f" [Extractor Logístico] Analizando reglas comerciales para: {state.get('item_actual_id', '')} (Intento {state.get('intentos_logistico', 0) + 1})")
     
     texto_crudo = state.get("texto_extraido", "")
-    trafo_actual = next((t for t in state.get("inventario_global", []) if t["item_id"] == state.get("item_actual_id", "")), None)
+    inventario = state.get("inventario_global", [])
+    trafo_actual = next((t for t in inventario if t["item_id"] == state.get("item_actual_id", "")), None)
     
     if not trafo_actual: 
         return {"datos_logisticos": {}}
 
+    # Identificar otras familias para la Regla de Aislamiento
+    familia_str = trafo_actual.get("tipo_transformador", "")
+    todas_familias = list(set([t.get("tipo_transformador", "") for t in inventario if t.get("tipo_transformador") and t.get("tipo_transformador") != "No especificado"]))
+    otras_familias = [f for f in todas_familias if f != familia_str]
+    otras_familias_str = ", ".join(otras_familias) if otras_familias else "Ninguna otra familia identificada"
+
+    # Si el revisor dejó feedback en un intento anterior, lo inyectamos como "lupa"
     feedback = state.get("feedback_logistico", "")
-    bloque_feedback = f"\n⚠️ ATENCIÓN - INSTRUCCIÓN DEL REVISOR:\n{feedback}\n" if feedback and "APROBADO" not in feedback else ""
+    bloque_feedback = f"\n ATENCIÓN - INSTRUCCIÓN DEL REVISOR:\n{feedback}\n" if feedback and "APROBADO" not in feedback else ""
 
     llm_estructurado = get_llm("agente_logistico").with_structured_output(DatosLogisticos)
     prompt = ChatPromptTemplate.from_template(PROMPT_EXTRACTOR_LOGISTICO)
     
-    resultado = (prompt | llm_estructurado).invoke({
-        "item_id": trafo_actual["item_id"],
+    cadena = prompt | llm_estructurado
+    resultado = cadena.invoke({
         "tipo_transformador": trafo_actual["tipo_transformador"],
-        "bloque_feedback": bloque_feedback,
-        "texto_pliego": texto_crudo
+        "otras_familias": otras_familias_str,
+        "texto_pliego": texto_crudo,
+        "bloque_feedback": bloque_feedback
     })
     
     return {"datos_logisticos": resultado.model_dump() if hasattr(resultado, 'model_dump') else resultado.dict()}
@@ -130,7 +148,7 @@ def nodo_revisor_logistico(state: BotState):
     """
     datos = state.get("datos_logisticos", {})
     intentos = state.get("intentos_logistico", 0)
-    print(f"🕵️‍♂️ [Revisor Comercial] Auditando riesgos del pliego...")
+    logger.info(f" [Revisor Comercial] Auditando riesgos del pliego...")
     
     faltan_datos = []
     if datos.get("lugar_entrega", {}).get("valor") == "No especificado":
@@ -139,20 +157,15 @@ def nodo_revisor_logistico(state: BotState):
         faltan_datos.append("garantias")
 
     if not faltan_datos:
-        print("✅ [Revisor Comercial] Datos completos. Aprobado.")
+        logger.info(" [Revisor Comercial] Datos completos. Aprobado.")
         return {"feedback_logistico": "APROBADO"}
     
-    if intentos < 1:
-        msg = f"No encontré: {', '.join(faltan_datos)}. Busca en secciones de 'Delivery', 'Warranty', 'Shipment' o 'Terms'."
-        print(f"❌ [Revisor Comercial] Faltan datos. Solicitando reintento... ({msg})")
-        return {"intentos_logistico": intentos + 1, "feedback_logistico": msg}
-    
-    print(f"⚠️ [Revisor Comercial] Intentos agotados. Generando alerta comercial para: {', '.join(faltan_datos)}")
+    logger.info(f" [Revisor Comercial] Datos faltantes. Generando alerta comercial para: {', '.join(faltan_datos)}")
     nuevas_alertas = []
     if "lugar_entrega" in faltan_datos:
-        nuevas_alertas.append("🚚 Comercial: Lugar de entrega no especificado en el pliego técnico. Sugerencia: Verificar correos anexos o asumir entrega EXW Fábrica Colombia.")
+        nuevas_alertas.append(" Comercial: Lugar de entrega no especificado en el pliego técnico. Sugerencia: Verificar correos anexos o asumir entrega EXW Fábrica Colombia.")
     if "garantias" in faltan_datos:
-        nuevas_alertas.append("🚚 Comercial: Periodo de garantía no especificado. Sugerencia: Cotizar con la garantía estándar de 18 meses a partir de la entrega.")
+        nuevas_alertas.append(" Comercial: Periodo de garantía no especificado. Sugerencia: Cotizar con la garantía estándar de 18 meses a partir de la entrega.")
         
     return {
         "datos_logisticos": datos, 

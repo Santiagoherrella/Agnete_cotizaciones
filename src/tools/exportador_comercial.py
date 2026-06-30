@@ -5,9 +5,12 @@ from docx import Document
 from docx.shared import Pt
 from datetime import datetime
 from src.schemas.state import BotState
+from src.utils.logger import get_logger
+logger = get_logger("ExportadorComercial")
+
 
 def nodo_word_comercial(state: BotState):
-    print("📝 [Exportador Comercial] Generando Resumen Ejecutivo en Word...")
+    logger.info(" [Exportador Comercial] Generando Resumen Ejecutivo en Word...")
     
     resumen_texto = state.get("resumen_comercial_ejecutivo", "No hay resumen disponible.")
     cliente = state.get("cliente_identificado", "Cliente_Generico")
@@ -29,11 +32,11 @@ def nodo_word_comercial(state: BotState):
     nombre_archivo = f"data/outputs/Resumen_Comercial_{cliente}_{datetime.now().strftime('%Y%m%d_%H%M')}.docx"
     doc.save(nombre_archivo)
     
-    print(f"✅ [Word Comercial] Guardado en: {nombre_archivo}")
+    logger.info(f" [Word Comercial] Guardado en: {nombre_archivo}")
     return {"rutas_fichas_word": [nombre_archivo]} # Lo añadimos a la lista de entregables
 
 def nodo_excel_comercial(state: BotState):
-    print("📊 [Exportador Comercial] Generando Checklist en Excel...")
+    logger.info(" [Exportador Comercial] Generando Checklist en Excel...")
     
     tabla_md = state.get("tabla_comercial_checklist", "")
     cliente = state.get("cliente_identificado", "Cliente_Generico")
@@ -59,10 +62,10 @@ def nodo_excel_comercial(state: BotState):
             
             # Guardar con formato limpio
             df.to_excel(nombre_excel, index=False)
-            print(f"✅ [Excel Comercial] Guardado en: {nombre_excel}")
+            logger.info(f" [Excel Comercial] Guardado en: {nombre_excel}")
             return {"rutas_tablas_ctg": [nombre_excel]}
             
     except Exception as e:
-        print(f"⚠️ Error al generar Excel Comercial: {e}")
+        logger.info(f" Error al generar Excel Comercial: {e}")
         
     return {}

@@ -5,7 +5,6 @@ from typing import Any
 
 from src.agents.alineador_normativo import nodo_alineador_normativo
 from src.agents.auditor_sdm import nodo_auditor_sdm
-from src.agents.intervencion_humana import nodo_human_in_the_loop
 from src.grafo import maquina_magnetron
 from src.schemas.state import BotState
 from src.tools.exportador_sdm import nodo_generar_json_sdm
@@ -134,27 +133,14 @@ def run_main_graph(initial_state: BotState) -> dict[str, Any]:
 
 def run_sdm_stage(state: dict[str, Any], human_answers: dict[str, str] | None = None) -> dict[str, Any]:
     """
-    Execute the SDM post-stage outside the main graph so the web app can
-    collect human input without relying on terminal input().
+    Execute the SDM post-stage outside the main graph.
     """
     current_state = dict(state)
 
     current_state = _merge_state(current_state, nodo_alineador_normativo(current_state))
     current_state = _merge_state(current_state, nodo_auditor_sdm(current_state))
-
-    if not current_state.get("auditoria_sdm_ok", False):
-        if not human_answers:
-            return {
-                "status": "needs_human_input",
-                "state": current_state,
-                "missing_fields": current_state.get("campos_faltantes_sdm", []),
-            }
-
-        current_state["modo_interaccion"] = "web"
-        current_state["respuestas_humanas"] = human_answers
-        current_state = _merge_state(current_state, nodo_human_in_the_loop(current_state))
-
     current_state = _merge_state(current_state, nodo_generar_json_sdm(current_state))
+
     return {
         "status": "completed",
         "state": current_state,

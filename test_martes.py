@@ -14,18 +14,18 @@ def ejecutar_prueba_maestra():
     # Validar archivos
     archivos = [f for f in os.listdir(carpeta_inputs) if os.path.isfile(os.path.join(carpeta_inputs, f))]
     if not archivos:
-        print("⚠️ No hay archivos en data/inputs/")
+        print(" No hay archivos en data/inputs/")
         return
 
     print("\n" + "="*60)
-    print("🚀 INICIANDO PRUEBA 1: SISTEMA MULTI-AGENTE MAGNETRÓN")
+    print(" INICIANDO PRUEBA 1: SISTEMA MULTI-AGENTE MAGNETRÓN")
     print(f"Archivos a procesar: {len(archivos)}")
     print("="*60)
 
     # 2. Consolidar todo el contexto (Engrapadora de documentos)
     texto_total = ""
     for arc in archivos:
-        print(f"📖 Leyendo: {arc}...")
+        print(f"Leyendo: {arc}...")
         texto_total += f"\n\n--- DOCUMENTO: {arc} ---\n"
         texto_total += extraer_texto_universal(os.path.join(carpeta_inputs, arc))
     
@@ -33,7 +33,7 @@ def ejecutar_prueba_maestra():
     estado_inicial: BotState = {
         "configuracion": { # Datos que vamos a extraer
             "ejecutar_ingenieria": True,
-            "ejecutar_comercial": True,
+            "ejecutar_comercial": False,
             "ejecutar_sdm": True
         },
         "ruta_documento": "PROYECTO_PEA_RIVER_BATCH",
@@ -55,22 +55,22 @@ def ejecutar_prueba_maestra():
 # --- NUEVO BLOQUE DE IMPRESIÓN ---
     import json
     print("\n" + "="*60)
-    print("🏆 RESULTADO FINAL DE LOS 4 ESCUADRONES")
+    print("RESULTADO FINAL DE LOS 4 ESCUADRONES")
     print("="*60)
     
-    print("\n⚡ DATOS ELÉCTRICOS:")
+    print("\n DATOS ELÉCTRICOS:")
     print(json.dumps(resultado.get("datos_electricos", {}), indent=2, ensure_ascii=False))
     
-    print("\n🔩 DATOS MECÁNICOS:")
+    print("\n DATOS MECÁNICOS:")
     print(json.dumps(resultado.get("datos_mecanicos", {}), indent=2, ensure_ascii=False))
     
-    print("\n🧰 DATOS ACCESORIOS:")
+    print("\n DATOS ACCESORIOS:")
     print(json.dumps(resultado.get("datos_accesorios", {}), indent=2, ensure_ascii=False))
     
-    print("\n🚚 DATOS LOGÍSTICOS:")
+    print("\n DATOS LOGÍSTICOS:")
     print(json.dumps(resultado.get("datos_logisticos", {}), indent=2, ensure_ascii=False))
     
-    print("\n🚨 ALERTAS DE DISEÑO (FALLBACKS):")
+    print("\n ALERTAS DE DISEÑO (FALLBACKS):")
     for alerta in resultado.get("alertas_diseno", []):
         print(f"  - {alerta}")
 

@@ -20,6 +20,9 @@ from src.schemas.modelos import TablaCTGFamilia
 from src.schemas.state import BotState
 from src.tools.exportador import exportar_ctg_excel
 from datetime import datetime
+from src.utils.logger import get_logger
+logger = get_logger("Ctg")
+
 
 # ==========================================
 # PROMPT: AGENTE DE CARACTERÍSTICAS GARANTIZADAS
@@ -54,12 +57,12 @@ def nodo_generar_tablas_ctg(state: BotState):
     - Una actualización parcial del estado: `{"rutas_tablas_ctg": [lista_de_rutas]}` 
       que contiene dónde se guardaron los Excels.
     """
-    print("\n📊 [Agente CTG] Iniciando estructuración de Características Técnicas Garantizadas...")
+    logger.info("\n [Agente CTG] Iniciando estructuración de Características Técnicas Garantizadas...")
     inventario = state.get("inventario_global", [])
     texto_crudo = state.get("texto_extraido", "")
 
     if not inventario or not texto_crudo:
-        print("⚠️ [Agente CTG] Faltan datos en el estado para operar.")
+        logger.info(" [Agente CTG] Faltan datos en el estado para operar.")
         return {"rutas_tablas_ctg": []}
 
     # 1. Agrupar por familia (Ej: 'Padmounted', 'CSP')
@@ -76,7 +79,7 @@ def nodo_generar_tablas_ctg(state: BotState):
 
     # 3. Iterar sobre cada familia y generar su matriz
     for tipo in tipos_unicos:
-        print(f"⚙️ [Agente CTG] Procesando matriz transversal para: {tipo}")
+        logger.info(f" [Agente CTG] Procesando matriz transversal para: {tipo}")
         
         # Filtrar solo los kVA que pertenecen a este tipo
         kvas_tipo = [item["potencia"] for item in inventario if item["tipo_transformador"] == tipo]

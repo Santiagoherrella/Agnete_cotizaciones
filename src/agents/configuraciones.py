@@ -1,12 +1,15 @@
 from src.schemas.state import BotState
 from src.agents.escuadron_logistico import decidir_ruta_logistico # <--- Faltaba esto
+from src.utils.logger import get_logger
+logger = get_logger("Configuraciones")
+
 
 def validador_inicial(state: BotState):
     """Evita que el bot arranque si no hay nada que hacer."""
     conf = state.get("configuracion", {})
     # Si todos los interruptores están en False, cancelamos
     if not any([conf.get("ejecutar_ingenieria"), conf.get("ejecutar_comercial"), conf.get("ejecutar_sdm")]):
-        print("🚨 [ERROR] No se seleccionó ninguna tarea. Abortando para ahorrar tokens.")
+        logger.info(" [ERROR] No se seleccionó ninguna tarea. Abortando para ahorrar tokens.")
         return "abortar"
     return "continuar"
 

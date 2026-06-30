@@ -2,49 +2,99 @@ import oracledb
 import pandas as pd
 import os
 from dotenv import load_dotenv
+from src.utils.logger import get_logger
+logger = get_logger("TestOracle")
+
 
 load_dotenv()
 
+
 def probar_conexion_magnetron():
-    print("="*50)
-    print("🔌 INICIANDO PRUEBA DE CONEXIÓN A ORACLE DB")
-    print("="*50)
+    logger.info("="*50)
+    logger.info("INICIANDO PRUEBA DE EXTRACCIÓN ORACLE DB")
+    logger.info("="*50)
     
-    # --- NUEVA LÍNEA: ACTIVAR EL THICK MODE ---
-    # Reemplaza la ruta por la carpeta exacta donde descomprimiste el archivo ZIP
     try:
         oracledb.init_oracle_client(lib_dir=r"C:\oracleinstantclient.23.26.1.0.0")
-        print("⚙️ Modo 'Thick' activado correctamente.")
     except Exception as e:
-        print(f"⚠️ Nota sobre el cliente Oracle: {e}")
+        pass # Si ya está iniciado no pasa nada
 
     user = os.environ.get("DB_USER")
     password = os.environ.get("DB_PASSWORD")
     dsn = os.environ.get("DB_DSN")
 
-    if not all([user, password, dsn]):
-        print("❌ ERROR: Faltan credenciales. Verifica tu archivo .env")
-        return
-
     try:
-        print(f"Intentando conectar a DSN: {dsn}...")
-        # Al conectarnos ahora, usará automáticamente el Instant Client
         conexion = oracledb.connect(user=user, password=password, dsn=dsn)
-        print("✅ ¡CONEXIÓN EXITOSA AL SERVIDOR!")
-        print(f"🏛️ Versión del motor Oracle: {conexion.version}")
-
-        # Aquí irá tu consulta después...
+        cursor = conexion.cursor()
         
+        # ==========================================
+        # PRUEBA 1: DESCUBRIR LOS NOMBRES REALES
+        # ==========================================
+        logger.info("\n 1. Buscando el nombre exacto de las tablas en el esquema DISENO...")
+        consulta_tablas = """
+        SELECT table_name 
+        FROM all_tables 
+        WHERE owner = 'DISENO' 
+        AND (table_name LIKE '%PAIS%' 
+             OR table_name LIKE '%NORMA%' 
+             OR table_name LIKE '%POTENCIA%' 
+             OR table_name LIKE '%VOLTAJE%')
+        ORDER BY table_name
+        """
+        cursor.execute(consulta_tablas)
+        tablas = cursor.fetchall()
+        
+        if tablas:
+            logger.info("Tablas encontradas:")
+            for t in tablas:
+                logger.info(f"   {t[0]}")
+        else:
+            logger.info("No se encontraron tablas con esos nombres clave.")
+
+        # ==========================================
+        # PRUEBA 2: EXTRAER DATOS (Ejemplo con PAISES)
+        # ==========================================
+        # NOTA: Si en la Prueba 1 viste que la tabla se llama distinto (Ej: PAISES_BK), 
+        # cámbialo en la línea de abajo.
+        tabla_a_probar = "DISENO.PAISES"  
+        
+        logger.info(f"\n2. Intentando extraer 5 registros de {tabla_a_probar}...")
+        try:
+            # Usamos Pandas para que la tabla se vea bonita en la terminal
+            df = pd.read_sql(f"SELECT * FROM {tabla_a_probar} WHERE ROWNUM <= 5", con=conexion)
+            logger.info("\n¡EXTRACCIÓN EXITOSA! Aquí tienes los datos:")
+            logger.info("-" * 50)
+            logger.info(df.to_string(index=False))
+            logger.info("-" * 50)
+        except Exception as e:
+            logger.info(f" Falló la extracción de la tabla. Puede que el nombre no sea {tabla_a_probar}.")
+            logger.info(f"Error: {e}")
+
         conexion.close()
-        print("\n🔌 Conexión cerrada de forma segura.")
+        logger.info("\n Conexión cerrada de forma segura.")
 
     except oracledb.DatabaseError as e:
         error, = e.args
-        print(f"\n❌ ERROR DE BASE DE DATOS:")
-        print(f"Código: {error.code}")
-        print(f"Mensaje: {error.message}")
+        logger.info(f"ERROR DE BASE DE DATOS: {error.code} - {error.message}")
     except Exception as e:
-        print(f"\n❌ ERROR GENERAL: {e}")
+        logger.info(f"ERROR INESPERADO: {e}")
+def listar_columnas():
+    conexion = oracledb.connect(user=os.environ.get("DB_USER"), password=os.environ.get("DB_PASSWORD"), dsn=os.environ.get("DB_DSN"))
+    cursor = conexion.cursor()
+    
+    # Vamos a revisar una tabla, por ejemplo NORMAS
+    cursor.execute("SELECT column_name FROM all_tab_columns WHERE table_name = 'NORMAS' AND owner = 'DISENO'")
+    columnas = cursor.fetchall()
+    logger.info(f"Columnas en DISENO.NORMAS: {[c[0] for c in columnas]}")
+    
+    # Hagamos lo mismo con VOLTAJE_PRIMARIO
+    cursor.execute("SELECT column_name FROM all_tab_columns WHERE table_name = 'VOLTAJE_PRIMARIO' AND owner = 'DISENO'")
+    columnas = cursor.fetchall()
+    logger.info(f"Columnas en DISENO.VOLTAJE_PRIMARIO: {[c[0] for c in columnas]}")
+    
+    conexion.close()
 
+#listar_columnas()
 if __name__ == "__main__":
     probar_conexion_magnetron()
+    listar_columnas()

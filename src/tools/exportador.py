@@ -6,10 +6,13 @@ from langchain_core.prompts import ChatPromptTemplate
 from src.corelogic import get_llm
 from src.schemas.state import BotState
 from src.schemas.modelos import TablaCTGFamilia
+from src.utils.logger import get_logger
+logger = get_logger("Exportador")
+
 
 def nodo_crear_excel_inventario(state: BotState):
     """Fase 2: Empaca el Excel global"""
-    print("📊 [Herramienta Excel] Empacando el inventario global en formato .xlsx...")
+    logger.info(" [Herramienta Excel] Empacando el inventario global en formato .xlsx...")
     inventario = state.get("inventario_global", [])
     if not inventario:
         return {"ruta_excel_inventario": ""}
@@ -22,7 +25,7 @@ def nodo_crear_excel_inventario(state: BotState):
     
     os.makedirs("data/outputs", exist_ok=True)
     df.to_excel(ruta_salida, index=False)
-    print(f"✅ Archivo Excel de Inventario generado: {ruta_salida}")
+    logger.info(f" Archivo Excel de Inventario generado: {ruta_salida}")
     return {"ruta_excel_inventario": ruta_salida}
 
 # ==========================================
@@ -55,7 +58,7 @@ def nodo_crear_excel_ctg(state: BotState):
     familia = trafo_actual.get("tipo_transformador", "General")
     trafos_familia = [t for t in inventario if t.get("tipo_transformador") == familia]
     
-    print(f"📊 [Generador CTG] Extrayendo matriz técnica (1 a 1) para {len(trafos_familia)} equipos de la familia: {familia}...")
+    logger.info(f" [Generador CTG] Extrayendo matriz técnica (1 a 1) para {len(trafos_familia)} equipos de la familia: {familia}...")
     
     # 1. Preparar la lista exacta para el LLM
     lista_str = ""
@@ -75,7 +78,7 @@ def nodo_crear_excel_ctg(state: BotState):
             "texto_pliego": state.get("texto_extraido", "")
         })
     except Exception as e:
-        print(f"❌ [Error CTG] Falló la extracción para {familia}: {e}")
+        logger.info(f" [Error CTG] Falló la extracción para {familia}: {e}")
         return {}
 
     # 3. Cruzar Inventario con LLM para asegurar 100% de precisión 1 a 1
@@ -132,5 +135,5 @@ def nodo_crear_excel_ctg(state: BotState):
         for col_i in range(3, 3 + len(trafos_familia)):
             worksheet.column_dimensions[chr(64 + col_i)].width = 20
 
-    print(f"✅ [Ensamblador CTG] Archivo guardado (1 a 1 con inventario): {ruta_salida}")
+    logger.info(f" [Ensamblador CTG] Archivo guardado (1 a 1 con inventario): {ruta_salida}")
     return {"rutas_tablas_ctg": [ruta_salida]}

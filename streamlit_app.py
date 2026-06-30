@@ -8,7 +8,9 @@ from src.services.pipeline_service import (
     resume_sdm_from_human_input,
     run_pipeline_from_uploads,
 )
+from src.utils.logger import current_user, SYSTEM_USER, get_logger
 
+logger = get_logger("StreamlitApp")
 
 st.set_page_config(
     page_title="Magnetron Orquestador de Cotizaciones",
@@ -120,16 +122,17 @@ def _render_summary(summary: dict) -> None:
     col3.metric("Items detectados", summary.get("total_items_inventario", 0))
     col4.metric("Familias procesadas", len(summary.get("familias_procesadas", [])))
 
-    cliente = summary.get("cliente") or "No identificado"
-    st.caption(f"Cliente detectado: {cliente}")
+    with st.expander("Ver Alertas y Familias detectadas", expanded=False):
+        cliente = summary.get("cliente") or "No identificado"
+        st.caption(f"Cliente detectado: {cliente}")
 
-    familias = summary.get("familias_procesadas", [])
-    if familias:
-        st.write("Familias procesadas:", ", ".join(familias))
+        familias = summary.get("familias_procesadas", [])
+        if familias:
+            st.write("Familias procesadas:", ", ".join(familias))
 
-    alertas = summary.get("alertas", [])
-    if alertas:
-        st.warning("\n".join(str(alerta) for alerta in alertas))
+        alertas = summary.get("alertas", [])
+        if alertas:
+            st.warning("\n".join(str(alerta) for alerta in alertas))
 
 
 def _render_state_views(state: dict) -> None:
@@ -138,14 +141,15 @@ def _render_state_views(state: dict) -> None:
         st.subheader("Inventario detectado")
         st.dataframe(pd.DataFrame(inventario), use_container_width=True)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Datos tecnicos")
-        st.caption("Electricos")
-        st.json(state.get("datos_electricos", {}))
-        st.caption("Mecanicos")
-        st.json(state.get("datos_mecanicos", {}))
-        st.caption("Accesorios")
+    with st.expander("Ver detalles técnicos (Modo Desarrollador)", expanded=False):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("Datos tecnicos")
+            st.caption("Electricos")
+            st.json(state.get("datos_electricos", {}))
+            st.caption("Mecanicos")
+            st.json(state.get("datos_mecanicos", {}))
+            st.caption("Accesorios")
         st.json(state.get("datos_accesorios", {}))
 
     with col2:
@@ -167,6 +171,47 @@ def _render_state_views(state: dict) -> None:
             st.caption("Datos normalizados SDM")
             st.json(state.get("datos_normalizados_sdm", {}))
 
+def render_feedback_button():
+    """Renderiza botón flotante que abre Forms para feedback"""
+    
+    # URL de tu Microsoft Forms
+    FORMS_URL = "https://forms.office.com/r/yLAnpwJw1V"
+    
+    st.markdown("""
+    <style>
+    .feedback-float-container {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 999;
+    }
+    .feedback-float-btn {
+        background: linear-gradient(135deg, #0f6db4 0%, #1a8fd9 100%);
+        color: white;
+        border: none;
+        border-radius: 50px;
+        padding: 14px 28px;
+        font-weight: 600;
+        font-size: 15px;
+        box-shadow: 0 4px 15px rgba(15, 109, 180, 0.4);
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+    }
+    .feedback-float-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(15, 109, 180, 0.5);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown(f"""
+    <div class="feedback-float-container">
+        <a href="{FORMS_URL}" target="_blank" class="feedback-float-btn">
+            💬 Déjanos tu Feedback
+        </a>
+    </div>
+    """, unsafe_allow_html=True)
 
 def _render_human_intervention_form() -> None:
     pending_fields = st.session_state.get("pending_fields", [])
@@ -205,6 +250,48 @@ def _render_human_intervention_form() -> None:
             st.rerun()
 
 
+def _render_toc_capitalization_form() -> None:
+    backend_state = st.session_state.get("backend_state")
+    if not backend_state:
+        return
+    datos_sdm = backend_state.get("datos_normalizados_sdm", {})
+    clasificacion = datos_sdm.get("clasificacion_ia", {})
+    
+    if not clasificacion.get("aplica_capitalizacion"):
+        return
+
+    st.subheader("Evaluación de Pérdidas (TOC)")
+    st.info("El sistema detectó que este pliego incluye fórmulas de capitalización de pérdidas. Confirme o ajuste los factores monetarios.")
+    
+    with st.form("toc_capitalization_form"):
+        col1, col2, col3, col4 = st.columns(4)
+        k1 = col1.number_input("K1 (Pérdidas en Vacío)", value=0.0, step=0.1)
+        k2 = col2.number_input("K2 (Pérdidas con Carga)", value=0.0, step=0.1)
+        k3 = col3.number_input("K3", value=0.0, step=0.1)
+        k4 = col4.number_input("K4", value=0.0, step=0.1)
+        
+        unidad = st.selectbox("Unidad original reportada", ["$/W", "$/kW"])
+        submitted = st.form_submit_button("Aplicar factores y regenerar JSON")
+        
+        if submitted:
+            factor = 0.001 if unidad == "$/kW" else 1.0
+            
+            backend_state["evaluacion_perdidas_economicas"] = {
+                "k1_normalizado_usd_w": k1 * factor,
+                "k2_normalizado_usd_w": k2 * factor,
+                "k3_normalizado_usd_w": k3 * factor,
+                "k4_normalizado_usd_w": k4 * factor
+            }
+            
+            from src.tools.exportador_sdm import nodo_generar_json_sdm
+            with st.spinner("Actualizando JSON SDM en caliente..."):
+                rutas = nodo_generar_json_sdm(backend_state)
+                # Actualizamos la visualización de los artefactos
+                st.session_state.workflow_result["summary"]["artifacts"]["json_sdm"] = rutas.get("rutas_sdm_json", [])
+            st.success("JSON SDM actualizado correctamente.")
+            st.rerun()
+
+
 def main() -> None:
     _init_session_state()
 
@@ -213,8 +300,15 @@ def main() -> None:
         "Carga uno o varios documentos, configura las fases a ejecutar y revisa "
         "los entregables tecnicos, comerciales y SDM desde una sola interfaz."
     )
+    
+    render_feedback_button()
 
     with st.sidebar:
+        st.header("Usuario Activo")
+        web_user = st.text_input("Ingresa tu nombre para los registros", value=SYSTEM_USER)
+        if web_user.strip():
+            current_user.set(web_user.strip())
+
         st.header("Configuracion")
         if st.button("Nueva cotizacion / Limpiar", type="secondary"):
             _reset_quote_ui()
@@ -293,6 +387,7 @@ def main() -> None:
             }
 
             with st.spinner("Procesando documentos y ejecutando orquestacion..."):
+                logger.critical(f"=== INICIO DE PROCESAMIENTO === | Archivos cargados: {[f.name for f in uploaded_files]}")
                 try:
                     result = run_pipeline_from_uploads(uploaded_files, request_config)
                 except ValueError as e:
@@ -318,6 +413,7 @@ def main() -> None:
 
     _render_summary(summary)
     _render_human_intervention_form()
+    _render_toc_capitalization_form()
     _render_artifacts(summary.get("artifacts", {}))
     _render_state_views(state)
 

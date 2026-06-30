@@ -1,5 +1,8 @@
 from src.schemas.state import BotState
 from langgraph.graph import StateGraph, END
+from src.utils.logger import get_logger
+logger = get_logger("Supervisor")
+
 
 def nodo_supervisor_familias(state: BotState):
     """
@@ -25,10 +28,10 @@ def nodo_supervisor_familias(state: BotState):
             
     # 3. Si no hay familias pendientes, terminamos el flujo global
     if not familia_pendiente:
-        print(f"\n👨‍💼 [Supervisor] ¡Todas las familias procesadas! Terminando flujo.")
+        logger.info(f"\n [Supervisor] ¡Todas las familias procesadas! Terminando flujo.")
         return {"item_actual_id": "FIN"}
         
-    print(f"\n👨‍💼 [Supervisor] Iniciando análisis para la Familia: {familia_pendiente} (Usando ref: {item_representativo})")
+    logger.info(f"\n [Supervisor] Iniciando análisis para la Familia: {familia_pendiente} (Usando ref: {item_representativo})")
     
     # ==========================================
     # 🔗 LA SOLUCIÓN AL BUCLE INFINITO

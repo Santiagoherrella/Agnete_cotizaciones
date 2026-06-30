@@ -21,6 +21,9 @@ from src.corelogic import get_llm
 from src.schemas.modelos import InventarioPedido, ClasificacionDocumento
 from src.schemas.state import BotState
 import os
+from src.utils.logger import get_logger
+logger = get_logger("Inventario")
+
 
 # ==========================================
 # PROMPT 0: EL CLASIFICADOR (CON EJEMPLO PARA MODELOS NANO)
@@ -104,7 +107,7 @@ def nodo_extraer_inventario(state: BotState):
     if not texto_crudo:
          return {"inventario_global": []}
 
-    print("\n🕵️‍♂️ [Enrutador] Analizando el tipo de documento...")
+    logger.info("\n [Enrutador] Analizando el tipo de documento...")
     
     # --- PASO A: CLASIFICAR ---
     llm_base = get_llm("enrutador")
@@ -117,7 +120,7 @@ def nodo_extraer_inventario(state: BotState):
     decision = cadena_clasificadora.invoke({"texto": texto_crudo[:1500]})
     
     tipo_doc = decision.tipo.upper() # Aseguramos que esté en mayúsculas
-    print(f"🔀 [Enrutador] Decisión: El documento es un {tipo_doc}. Asignando especialista...")
+    logger.info(f"[Enrutador] Decisión: El documento es un {tipo_doc}. Asignando especialista...")
     
     # --- PASO B: ENRUTAR Y EXTRAER ---
     # La escogencia del tipo documental define el comportamiento y tono del LLM.
@@ -135,11 +138,11 @@ def nodo_extraer_inventario(state: BotState):
     cadena = prompt | llm_con_molde
     
     # Ejecutamos la extracción con el prompt y temperatura elegidos
-    print(f"⚙️ [Agente {tipo_doc}] Extrayendo información...")
+    logger.info(f"[Agente {tipo_doc}] Extrayendo información...")
     resultado = cadena.invoke({"texto": texto_crudo})
     
     lista_inventario = [item.model_dump() if hasattr(item, 'model_dump') else item.dict() for item in resultado.equipos]
-    print(f"✅ [Agente {tipo_doc}] ¡Éxito! Se encontraron {len(lista_inventario)} equipos.")
+    logger.info(f"[Agente {tipo_doc}] ¡Éxito! Se encontraron {len(lista_inventario)} equipos.")
     
     return {"inventario_global": lista_inventario}
 

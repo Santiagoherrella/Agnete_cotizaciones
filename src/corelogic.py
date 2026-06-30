@@ -57,7 +57,7 @@ def get_llm(id_agente: str):
     """
     # Verificar si el agente está registrado
     if id_agente not in config:
-        raise ValueError(f"❌ [CoreLogic] El agente '{id_agente}' no está definido en config.json")
+        raise ValueError(f" [CoreLogic] El agente '{id_agente}' no está definido en config.json")
 
     parametros = config[id_agente]
     provider = parametros.get("llm_provider", "").lower()
@@ -72,6 +72,7 @@ def get_llm(id_agente: str):
         return ChatOpenAI(
             model=model_name,
             temperature=temperature,
+            max_retries=5,
             api_key=os.getenv("OPENAI_API_KEY")
         )
 
@@ -82,6 +83,7 @@ def get_llm(id_agente: str):
         return ChatGoogleGenerativeAI(
             model=model_name, 
             temperature=temperature,
+            max_retries=5,
             google_api_key=os.getenv("GOOGLE_API_KEY")
         )
         
@@ -92,6 +94,7 @@ def get_llm(id_agente: str):
         return ChatXAI(
             model=model_name, 
             temperature=temperature,
+            max_retries=5,
             api_key=os.getenv("GROK_API_KEY")
         )
         

@@ -21,6 +21,9 @@ from datetime import datetime
 from docx import Document
 from docx.shared import Pt, RGBColor
 from src.schemas.state import BotState
+from src.utils.logger import get_logger
+logger = get_logger("ResumenGeneral")
+
 
 def limpiar_texto_xml(texto):
     """
@@ -88,7 +91,7 @@ def nodo_generar_resumen_tipo(state: BotState):
     if not trafo_actual: return {}
     familia = trafo_actual.get("tipo_transformador", "General")
     
-    print(f"📝 [Ensamblador Word] Redactando Documento Técnico para la familia: {familia}...")
+    logger.info(f" [Ensamblador Word] Redactando Documento Técnico para la familia: {familia}...")
     
     # 2. Crear el Documento Word
     doc = Document()
@@ -105,6 +108,42 @@ def nodo_generar_resumen_tipo(state: BotState):
     
     # 4. Inyectar las Alertas de Diseño (Banderas Rojas)
     alertas = state.get("alertas_diseno", [])
+    
+    # Auditoría Completa de Certificaciones para el Word (UL, FM, NTC, etc.)
+    try:
+        from src.tools.exportador_sdm import auditar_certificaciones, extraer_numero_limpio
+        
+        logi = state.get("datos_logisticos", {})
+        cert_info = logi.get("certificaciones_solicitadas", {})
+        cert_val = cert_info.get("valor", "").lower() if isinstance(cert_info, dict) else str(cert_info).lower()
+        
+        # Extraer variables del trafo actual
+        tipo_trafo = trafo_actual.get("tipo_transformador", "")
+        fases_str = str(trafo_actual.get("fases", "")).lower()
+        fases_num = 1 if any(p in fases_str for p in ["mono", "1", "one", "single", "una"]) else 3
+        kva_num = extraer_numero_limpio(trafo_actual.get("potencia", ""))
+        
+        mec = state.get("datos_mecanicos", {})
+        mat_info = mec.get("material_bobinados", "")
+        material_bobinado = mat_info.get("valor", "") if isinstance(mat_info, dict) else str(mat_info)
+        
+        # Ejecutar auditoría
+        auditoria = auditar_certificaciones(cert_val, tipo_trafo, fases_num, kva_num, material_bobinado)
+        
+        # Inyectar Alertas Críticas (Ej. FM)
+        alertas.extend(auditoria.get("alertas_criticas", []))
+        
+        # Inyectar Alerta Normativa si piden UL pero la regla dice que no aplica (Ej. Monofásico)
+        if "ul" in cert_val and auditoria.get("ul_aplica") is False:
+            alertas.append(f"ALERTA NORMATIVA: El pedido exige certificación UL, pero según las reglas internas NO APLICA para este equipo. Motivo: {auditoria.get('ul_detalle')}.")
+            
+        # Inyectar Notas (NTC, DOE, Corrugados)
+        for nota in auditoria.get("notas_informativas", []):
+            alertas.append(f"INFORMACIÓN: {nota}")
+            
+    except Exception as e:
+        logger.info(f" [Ensamblador Word] Error al auditar certificaciones: {e}")
+        
     if alertas:
         doc.add_heading("🚨 ALERTAS Y RECOMENDACIONES NORMATIVAS", level=2)
         for alerta in alertas:
@@ -119,7 +158,7 @@ def nodo_generar_resumen_tipo(state: BotState):
     
     os.makedirs("data/outputs", exist_ok=True)
     doc.save(ruta_docx)
-    print(f"✅ [Ensamblador Word] Documento guardado en: {ruta_docx}")
+    logger.info(f" [Ensamblador Word] Documento guardado en: {ruta_docx}")
     
     completados_actuales = state.get("resumenes_completados", [])
     rutas_actuales = state.get("rutas_fichas_word", [])

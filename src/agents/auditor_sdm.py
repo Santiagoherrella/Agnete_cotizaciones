@@ -31,7 +31,7 @@ def nodo_auditor_sdm(state: BotState):
     # Si no pasa la auditoría, añadimos una alerta roja al estado
     alertas = state.get("alertas_diseno", [])
     if not reporte.aprobado_para_sdm:
-        alertas.append(f"🛑 ERROR SDM: Datos insuficientes ({', '.join(reporte.campos_faltantes)}). {reporte.observaciones}")
+        alertas.append(f" ERROR SDM: Datos insuficientes ({', '.join(reporte.campos_faltantes)}). {reporte.observaciones}")
     
     return {
         "alertas_diseno": alertas,

@@ -1,62 +1,97 @@
 import re
 import pandas as pd
 import os
+import json
 import streamlit as st
 import oracledb
 from dotenv import load_dotenv
+from src.utils.logger import get_logger
+logger = get_logger("NormalizadorSdm")
+
+
+try:
+    from src.corelogic import get_llm
+    from langchain_core.messages import HumanMessage, SystemMessage
+except ImportError:
+    pass # Por si no se ejecuta en un entorno donde esté disponible
 
 load_dotenv()
 
 # Inicializar Thick Mode de forma segura
 try:
     oracle_client_lib_dir = os.environ.get("ORACLE_CLIENT_LIB_DIR", "").strip()
-    if oracle_client_lib_dir:
-        oracledb.init_oracle_client(lib_dir=oracle_client_lib_dir)
+    if not oracle_client_lib_dir:
+        oracle_client_lib_dir = r"C:\oracleinstantclient.23.26.1.0.0"
+    oracledb.init_oracle_client(lib_dir=oracle_client_lib_dir)
 except oracledb.ProgrammingError:
     pass
 except Exception as e:
-    print(f"⚠️ Aviso Oracle Client: {e}")
+    logger.info(f" Aviso Oracle Client: {e}")
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def cargar_tablas_desde_oracle():
-    print("\\n🔌 [Caché] Conectando a Oracle DB para cargar tablas maestras...")
+    logger.info("\\n[Caché] Conectando a Oracle DB para cargar tablas maestras...")
     db_local = {}
     user     = os.environ.get("DB_USER")
     password = os.environ.get("DB_PASSWORD")
     dsn      = os.environ.get("DB_DSN")
 
     if not all([user, password, dsn]):
-        print("❌ Error: Credenciales incompletas en .env")
+        logger.info(" Error: Credenciales incompletas en .env")
         return db_local
 
     try:
         conexion = oracledb.connect(user=user, password=password, dsn=dsn)
+        # Definimos las consultas con nombres de tabla limpios (sin _BK)
         consultas = {
-            "paises":        "SELECT IDPAIS, PAIS, FRECUENCIA FROM DISENO.PAISES",
-            "normas":        "SELECT IDNORMA, NORMA, NORMA_ABR, IDPAIS, ALTURA, TI, TR, DTC, DTA FROM DISENO.NORMAS",
-            "potencias":     "SELECT IDKVA, POTENCIA, FASES FROM DISENO.POTENCIA",
-            "voltajes_pri":  "SELECT IDVP, VP, E1, E11, CONEXE1, CONEXE11 FROM DISENO.VOLTAJE_PRIMARIO",
-            "voltajes_sec":  "SELECT IDVS, VS, E2, E21, CONEXE2, FASES FROM DISENO.VOLTAJE_SECUNDARIO",
+            "paises": "SELECT IDPAIS, PAIS, FRECUENCIA FROM DISENO.PAISES",
+            "normas": "SELECT IDNORMA, NORMA FROM DISENO.NORMAS",
+            "potencias": "SELECT IDKVA, POTENCIA FROM DISENO.POTENCIA",
+            "voltajes_pri": "SELECT IDVP, VP, E1, E11 FROM DISENO.VOLTAJE_PRIMARIO",
+            "voltajes_sec": "SELECT IDVS, VS, E2, E21 FROM DISENO.VOLTAJE_SECUNDARIO",
+            "caracteristicas_electricas": "SELECT * FROM DISENO.CARACTERISTICAS_ELECTRICAS",
+            "eficiencia": "SELECT * FROM DISENO.EFICIENCIA_BK"
         }
-        cursor = conexion.cursor()
-        for clave, query in consultas.items():
+        
+        for clave, sql in consultas.items():
             try:
-                cursor.execute(query)
-                cols = [col[0] for col in cursor.description]
-                rows = cursor.fetchall()
-                db_local[clave] = pd.DataFrame(rows, columns=cols)
+                df = pd.read_sql(sql, con=conexion)
+                db_local[clave] = df
+                logger.info(f"OK: Tabla {clave} cargada correctamente ({len(df)} registros).")
             except Exception as e:
-                db_local[clave] = pd.DataFrame()
-        cursor.close()
+                logger.info(f"ERROR: Error cargando tabla {clave}: {e}")
+        
         conexion.close()
-        print("🔌 Conexión a Oracle DB cerrada exitosamente.\\n")
     except Exception as e:
-        print(f"❌ Error crítico de conexión a Oracle: {e}")
+        logger.info(f" Error crítico de conexión a Oracle: {e}")
     return db_local
 
 class MotorNormalizacionSDM:
     def __init__(self):
         self.db = cargar_tablas_desde_oracle()
+
+    def clasificar_eficiencia_y_toc(self, texto_eficiencia, texto_perdidas):
+        """Usa el LLM para identificar si aplica evaluación de pérdidas (TOC) y qué norma de eficiencia se requiere."""
+        try:
+            llm = get_llm("agente_electrico")
+            system_prompt = '''Eres un experto en ingeniería eléctrica clasificando datos de transformadores.
+Tu tarea es devolver un JSON estricto con la siguiente estructura:
+{
+    "aplica_capitalizacion": bool, // true si el texto habla de TOC, factores de capitalización monetaria, K1, K2, o evaluación de pérdidas en dólares/moneda.
+    "norma_eficiencia_clasificada": string // Nombre de la norma de eficiencia encontrada (ej. "DOE 2016", "NTC 819"). null si no se identifica.
+}
+Responde ÚNICAMENTE con el JSON validado. No añadas markdown ni texto adicional.
+'''
+            user_prompt = f"Texto Eficiencia: {texto_eficiencia}\nTexto Pérdidas: {texto_perdidas}"
+            resp = llm.invoke([SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)])
+            
+            match = re.search(r'\{.*\}', resp.content, re.DOTALL)
+            if match:
+                return json.loads(match.group(0))
+            return {"aplica_capitalizacion": False, "norma_eficiencia_clasificada": None}
+        except Exception as e:
+            logger.info(f"Error en clasificador LLM de eficiencia: {e}")
+            return {"aplica_capitalizacion": False, "norma_eficiencia_clasificada": None}
 
     def extraer_numero(self, texto) -> float | None:
         """Mejorada para manejar comas, espacios y decimales correctamente"""
@@ -77,7 +112,7 @@ class MotorNormalizacionSDM:
     def _df_vacio(self, clave: str, nombre_display: str):
         df = self.db.get(clave, pd.DataFrame())
         if df.empty:
-            return df, True, f"🚨 SDM: Tabla {nombre_display} vacía o no cargada desde Oracle."
+            return df, True, f"[!] Advertencia: Tabla {nombre_display} vacía o no cargada desde Oracle."
         df.columns = [col.upper() for col in df.columns]
         return df, False, None
 
@@ -98,7 +133,7 @@ class MotorNormalizacionSDM:
         filtro = df[df["PAIS"].astype(str).str.upper() == pais_limpio]
         if not filtro.empty:
             return str(filtro.iloc[0]["IDPAIS"]), str(filtro.iloc[0]["PAIS"]), None
-        return None, None, f"🚨 SDM: País '{texto_geografico}' no encontrado."
+        return None, None, f"SDM: País '{texto_geografico}' no encontrado."
 
     def normalizar_norma(self, norma_cruda: str, id_pais: str):
         df, vacio, alerta_error = self._df_vacio("normas", "NORMAS")
@@ -108,7 +143,7 @@ class MotorNormalizacionSDM:
         if norma_limpia in ("", "NO ESPECIFICADO", "NAN"):
             if id_pais == "H": norma_limpia = "ANSI"
             elif id_pais == "0": norma_limpia = "NTC"
-            else: return None, None, "🚨 SDM: Norma no especificada."
+            else: return None, None, "SDM: Norma no especificada."
 
         # Extraer palabras clave de la norma cruda (ANSI, IEEE, NTC)
         palabras_clave = []
@@ -124,14 +159,14 @@ class MotorNormalizacionSDM:
             (df.get("NORMA_ABR", pd.Series(dtype=str)).astype(str).str.upper().str.contains(busqueda, na=False))
         ]
         if not filtro.empty:
-            if id_pais and not filtro[filtro["IDPAIS"] == id_pais].empty:
+            if id_pais and "IDPAIS" in filtro.columns and not filtro[filtro["IDPAIS"] == id_pais].empty:
                 filtro = filtro[filtro["IDPAIS"] == id_pais]
             return str(filtro.iloc[0]["IDNORMA"]), str(filtro.iloc[0]["NORMA"]), None
-        return None, None, f"🚨 SDM: Norma asociada a '{busqueda}' no encontrada."
+        return None, None, f"SDM: Norma asociada a '{busqueda}' no encontrada."
 
     def normalizar_potencia(self, kva_crudo: str):
         valor_num = self.extraer_numero(kva_crudo)
-        if valor_num is None: return None, None, "🚨 SDM: Potencia inválida."
+        if valor_num is None: return None, None, "SDM: Potencia inválida."
 
         df, vacio, alerta_error = self._df_vacio("potencias", "POTENCIA")
         if vacio: return None, None, alerta_error
@@ -142,32 +177,38 @@ class MotorNormalizacionSDM:
         
         if not filtro.empty:
             return str(filtro.iloc[0]["IDKVA"]), f"{int(filtro.iloc[0]['POTENCIA'])} kVA", None
-        return None, None, f"🚨 SDM: Potencia {valor_num} kVA no encontrada."
+        return None, None, f"SDM: Potencia {valor_num} kVA no encontrada."
 
     def normalizar_voltaje_primario(self, vp_crudo: str):
         valor_num = self.extraer_numero(vp_crudo)
-        if valor_num is None: return None, None, "🚨 SDM: Voltaje Primario inválido."
+        if valor_num is None: return None, None, None, None, "SDM: Voltaje Primario inválido."
         if valor_num < 1000 and "kv" in str(vp_crudo).lower(): valor_num *= 1000
 
         df, vacio, alerta_error = self._df_vacio("voltajes_pri", "VOLTAJE_PRIMARIO")
-        if vacio: return None, None, alerta_error
+        if vacio: return None, None, None, None, alerta_error
 
         valor_str = str(int(valor_num)) if valor_num == int(valor_num) else str(valor_num)
         filtro = df[df["E1"].astype(str).str.strip() == valor_str]
         if not filtro.empty:
-            return str(filtro.iloc[0]["IDVP"]), str(filtro.iloc[0]["VP"]), None
-        return None, None, f"🚨 SDM: Voltaje primario {valor_str} V no encontrado."
+            fila = filtro.iloc[0]
+            e1 = fila.get("E1")
+            e11 = fila.get("E11") if pd.notna(fila.get("E11")) else None
+            return str(fila["IDVP"]), str(fila["VP"]), e1, e11, None
+        return None, None, None, None, f"SDM: Voltaje primario {valor_str} V no encontrado."
 
     def normalizar_voltaje_secundario(self, vs_crudo: str):
         valor_num = self.extraer_numero(vs_crudo)
-        if valor_num is None: return None, None, "🚨 SDM: Voltaje Secundario inválido."
+        if valor_num is None: return None, None, None, None, "SDM: Voltaje Secundario inválido."
 
         df, vacio, alerta_error = self._df_vacio("voltajes_sec", "VOLTAJE_SECUNDARIO")
-        if vacio: return None, None, alerta_error
+        if vacio: return None, None, None, None, alerta_error
 
         df["E2"] = pd.to_numeric(df["E2"], errors="coerce")
         # Tolerancia pequeña para flotantes
         filtro = df[abs(df["E2"] - valor_num) < 0.01]
         if not filtro.empty:
-            return str(filtro.iloc[0]["IDVS"]), str(filtro.iloc[0]["VS"]), None
-        return None, None, f"🚨 SDM: Voltaje secundario {valor_num} V no encontrado."
+            fila = filtro.iloc[0]
+            e2 = fila.get("E2")
+            e21 = fila.get("E21") if pd.notna(fila.get("E21")) else None
+            return str(fila["IDVS"]), str(fila["VS"]), e2, e21, None
+        return None, None, None, None, f"SDM: Voltaje secundario {valor_num} V no encontrado."
